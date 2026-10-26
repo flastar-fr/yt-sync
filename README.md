@@ -78,10 +78,13 @@ uv run --package yt-sync-cli python -m yt_sync_cli.main ./music "https://www.you
 
 ### Web Application
 
-Start the local development server:
+Start the local server scoped to a target directory:
 
 ```bash
-uv run --package yt-sync-web uvicorn yt_sync_web.main:app --reload
+uv run --package yt-sync-web python -m yt_sync_web.main /path/to/my_folder
+
+# Optional custom host and port:
+uv run --package yt-sync-web python -m yt_sync_web.main /path/to/my_folder --host 127.0.0.1 --port 8000
 ```
 
 Navigate to `http://127.0.0.1:8000` in your web browser.

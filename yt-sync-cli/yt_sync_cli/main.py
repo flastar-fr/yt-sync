@@ -170,8 +170,14 @@ def run_sync(
     else:
         print("\n✨ Nothing to download, target directory is up-to-date!")
 
+    from datetime import datetime, timezone
+
     # 6. Save updated synchronization state
-    new_state = SyncState(tracks=updated_tracks)
+    new_state = SyncState(
+        playlist_url=playlist_url,
+        last_synced_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        tracks=updated_tracks,
+    )
     try:
         state_manager.save(new_state)
         print(f"💾 Sync complete. State saved ({len(updated_tracks)} track(s) indexed).")

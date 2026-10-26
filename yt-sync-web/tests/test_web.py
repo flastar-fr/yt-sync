@@ -1,4 +1,4 @@
-"""Tests unitaires et d'intégration pour l'application Web FastAPI."""
+"""Unit and integration tests for the folder-scoped FastAPI web application."""
 
 from __future__ import annotations
 
@@ -9,9 +9,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from yt_sync_core import __version__ as core_version
-from yt_sync_core.diff_engine import DiffResult
 from yt_sync_core.extractor import RemoteTrack
-from yt_sync_core.models import TrackSnapshot, TrackStatus
+from yt_sync_core.models import SyncState, TrackSnapshot, TrackStatus
 from yt_sync_core.storage import STATE_FILENAME, StateManager
 from yt_sync_web import __version__
 from yt_sync_web.main import app
@@ -27,10 +26,17 @@ def client() -> TestClient:
     return TestClient(app)
 
 
-class TestWebRoutes:
-    """Vérifie le comportement des routes FastAPI."""
+class TestWebDashboard:
+    """Validate folder-scoped dashboard lifecycle and HTMX 2 endpoints."""
 
-    def test_get_index_returns_html_page_with_htmx2(self, client: TestClient) -> None:
+    def test_get_index_shows_init_form_when_no_state_exists(
+        self, client: TestClient, tmp_path: Path
+    ) -> None:
+        # Arrange: Scoped to an empty folder without .yt_sync_state.json
+        empty_folder = tmp_path / "empty_music"
+        empty_folder.mkdir()
+        app.state.target_dir = empty_folder
+
         # Act
         response = client.get("/")
 
@@ -38,95 +44,186 @@ class TestWebRoutes:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
         assert "htmx.org@2." in response.text
-        assert 'hx-post="/analyze"' in response.text
+        assert "Initialize Folder Synchronization" in response.text
+        assert 'hx-post="/initialize"' in response.text
 
     @patch("yt_sync_web.main.PlaylistExtractor")
-    def test_post_analyze_returns_report_fragment(
-        self,
-        mock_extractor_class: MagicMock,
-        client: TestClient,
-        tmp_path: Path,
+    def test_get_index_loads_local_state_without_network_when_state_exists(
+        self, mock_extractor_class: MagicMock, client: TestClient, tmp_path: Path
+    ) -> None:
+        # Arrange: Folder with pre-existing .yt_sync_state.json
+        music_folder = tmp_path / "my_music"
+        music_folder.mkdir()
+        app.state.target_dir = music_folder
+
+        manager = StateManager(target_dir=music_folder)
+        existing_state = SyncState(
+            playlist_url="https://youtube.com/playlist?list=TEST",
+            playlist_name="Saved Local Playlist",
+            last_synced_at="2026-10-26 12:00:00 UTC",
+            tracks={
+                "vid1": TrackSnapshot(video_id="vid1", title="Already Here", status=TrackStatus.DOWNLOADED),
+                "vid2": TrackSnapshot(
+                    video_id="vid2",
+                    title="Archived Old Song",
+                    status=TrackStatus.ERROR,
+                    error_message="Unavailable on YouTube",
+                ),
+            },
+        )
+        manager.save(existing_state)
+
+        # Act
+        response = client.get("/")
+
+        # Assert: Loaded purely from local state with ZERO network calls!
+        assert response.status_code == 200
+        mock_extractor_class.assert_not_called()
+        assert "Saved Local Playlist" in response.text
+        assert "Already Here" in response.text
+        assert "Archived Old Song" in response.text
+        assert "Check for Updates" in response.text
+        assert 'hx-post="/refresh"' in response.text
+
+    @patch("yt_sync_web.main.PlaylistExtractor")
+    def test_post_initialize_creates_state_and_returns_dashboard(
+        self, mock_extractor_class: MagicMock, client: TestClient, tmp_path: Path
     ) -> None:
         # Arrange
+        init_folder = tmp_path / "init_music"
+        init_folder.mkdir()
+        app.state.target_dir = init_folder
+
         mock_extractor = mock_extractor_class.return_value
-        mock_extractor.fetch_playlist.return_value = [
-            RemoteTrack(video_id="new1", title="New Song", is_available=True),
-            RemoteTrack(video_id="unavail1", title="[Private]", is_available=False),
-        ]
-        target_dir = tmp_path / "music_web"
+        mock_extractor.fetch_playlist_details.return_value = (
+            "Rock Classics",
+            [
+                RemoteTrack(video_id="rk1", title="Bohemian Rhapsody", is_available=True),
+                RemoteTrack(video_id="rk2", title="[Private Video]", is_available=False),
+            ],
+        )
 
         # Act
         response = client.post(
-            "/analyze",
-            data={
-                "target_dir": str(target_dir),
-                "playlist_url": "https://youtube.com/playlist?list=fake",
-            },
+            "/initialize",
+            data={"playlist_url": "https://youtube.com/playlist?list=ROCK"},
         )
 
         # Assert
         assert response.status_code == 200
-        assert "Rapport Différentiel" in response.text
-        assert "New Song" in response.text
-        assert "Pistes inaccessibles" in response.text
-        assert 'hx-post="/sync"' in response.text
-
-    @patch("yt_sync_web.main.PlaylistExtractor")
-    def test_post_sync_executes_download_and_saves_state(
-        self,
-        mock_extractor_class: MagicMock,
-        client: TestClient,
-        tmp_path: Path,
-    ) -> None:
-        # Arrange
-        mock_extractor = mock_extractor_class.return_value
-        mock_extractor.fetch_playlist.return_value = [
-            RemoteTrack(video_id="track10", title="Track 10", is_available=True)
-        ]
-        target_dir = tmp_path / "sync_web_dest"
-
-        # Act
-        response = client.post(
-            "/sync",
-            data={
-                "target_dir": str(target_dir),
-                "playlist_url": "https://youtube.com/playlist?list=fake",
-            },
-        )
-
-        # Assert
-        assert response.status_code == 200
-        assert "Synchronisation terminée avec succès" in response.text
-        mock_extractor.download_tracks.assert_called_once()
-        state_file = target_dir / STATE_FILENAME
+        assert "Rock Classics" in response.text
+        assert "Bohemian Rhapsody" in response.text
+        state_file = init_folder / STATE_FILENAME
         assert state_file.exists()
-        manager = StateManager(target_dir=target_dir)
-        state = manager.load()
-        assert "track10" in state.tracks
-        assert state.tracks["track10"].status == TrackStatus.DOWNLOADED
+        loaded = StateManager(target_dir=init_folder).load()
+        assert loaded.playlist_name == "Rock Classics"
+        assert "rk1" in loaded.tracks
+        assert loaded.tracks["rk1"].status == TrackStatus.PENDING
+        assert loaded.tracks["rk2"].status == TrackStatus.ERROR
 
     @patch("yt_sync_web.main.PlaylistExtractor")
-    def test_post_analyze_error_returns_error_fragment(
-        self,
-        mock_extractor_class: MagicMock,
-        client: TestClient,
-        tmp_path: Path,
+    def test_post_refresh_manual_polling_returns_diff_dashboard(
+        self, mock_extractor_class: MagicMock, client: TestClient, tmp_path: Path
     ) -> None:
-        # Arrange
-        mock_extractor = mock_extractor_class.return_value
-        mock_extractor.fetch_playlist.side_effect = RuntimeError("Extraction crashed")
-        target_dir = tmp_path / "err_dir"
+        # Arrange: Setup directory with 1 downloaded track
+        refresh_folder = tmp_path / "refresh_music"
+        refresh_folder.mkdir()
+        app.state.target_dir = refresh_folder
 
-        # Act
-        response = client.post(
-            "/analyze",
-            data={
-                "target_dir": str(target_dir),
-                "playlist_url": "https://invalid",
-            },
+        manager = StateManager(target_dir=refresh_folder)
+        manager.save(
+            SyncState(
+                playlist_url="https://youtube.com/playlist?list=PL_TEST",
+                playlist_name="Electronic Gems",
+                tracks={
+                    "el1": TrackSnapshot(video_id="el1", title="Existing Track", status=TrackStatus.DOWNLOADED),
+                },
+            )
         )
+
+        mock_extractor = mock_extractor_class.return_value
+        mock_extractor.fetch_playlist_details.return_value = (
+            "Electronic Gems",
+            [
+                RemoteTrack(video_id="el1", title="Existing Track", is_available=True),
+                RemoteTrack(video_id="el2", title="New Drop", is_available=True),
+            ],
+        )
+
+        # Act: Manual refresh button clicked
+        response = client.post("/refresh")
 
         # Assert
         assert response.status_code == 200
-        assert "Une erreur est survenue" in response.text
-        assert "Extraction crashed" in response.text
+        assert "Existing Track" in response.text
+        assert "New Drop" in response.text
+        assert "Downloaded" in response.text
+        assert "New" in response.text
+        assert 'Sync Missing Tracks' in response.text
+
+    @patch("yt_sync_web.main.PlaylistExtractor")
+    def test_post_sync_downloads_missing_tracks_and_updates_state(
+        self, mock_extractor_class: MagicMock, client: TestClient, tmp_path: Path
+    ) -> None:
+        # Arrange
+        sync_folder = tmp_path / "sync_music"
+        sync_folder.mkdir()
+        app.state.target_dir = sync_folder
+
+        manager = StateManager(target_dir=sync_folder)
+        manager.save(
+            SyncState(
+                playlist_url="https://youtube.com/playlist?list=PL_TEST",
+                playlist_name="My Playlist",
+                tracks={},
+            )
+        )
+
+        mock_extractor = mock_extractor_class.return_value
+        mock_extractor.fetch_playlist_details.return_value = (
+            "My Playlist",
+            [RemoteTrack(video_id="new1", title="Track One", is_available=True)],
+        )
+
+        # Act
+        response = client.post("/sync")
+
+        # Assert
+        assert response.status_code == 200
+        mock_extractor.download_tracks.assert_called_once_with(["new1"], output_dir=str(sync_folder))
+        loaded = manager.load()
+        assert loaded.tracks["new1"].status == TrackStatus.DOWNLOADED
+        assert loaded.last_synced_at is not None
+
+    def test_post_ignore_track_marks_status_as_skipped(
+        self, client: TestClient, tmp_path: Path
+    ) -> None:
+        # Arrange
+        ignore_folder = tmp_path / "ignore_music"
+        ignore_folder.mkdir()
+        app.state.target_dir = ignore_folder
+
+        manager = StateManager(target_dir=ignore_folder)
+        manager.save(
+            SyncState(
+                playlist_url="https://youtube.com/playlist?list=PL_TEST",
+                playlist_name="Test Playlist",
+                tracks={
+                    "del1": TrackSnapshot(
+                        video_id="del1",
+                        title="Deleted Song Title",
+                        status=TrackStatus.ERROR,
+                        error_message="Unavailable on YouTube",
+                    )
+                },
+            )
+        )
+
+        # Act: User clicks "Mark as Skipped"
+        response = client.post("/ignore/del1")
+
+        # Assert
+        assert response.status_code == 200
+        loaded = manager.load()
+        assert loaded.tracks["del1"].status == TrackStatus.SKIPPED
+        assert "Skipped" in response.text

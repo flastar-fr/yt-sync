@@ -38,9 +38,15 @@ class SyncState(BaseModel):
     """Global synchronization state for a target directory.
 
     Attributes:
+        playlist_url: Optional YouTube playlist URL associated with this folder.
+        playlist_name: Optional playlist title.
+        last_synced_at: Optional timestamp of the last synchronization.
         tracks: Mapping of video_id to TrackSnapshot.
     """
 
+    playlist_url: str | None = None
+    playlist_name: str | None = None
+    last_synced_at: str | None = None
     tracks: dict[str, TrackSnapshot] = Field(default_factory=dict)
 
     model_config = {"frozen": True}

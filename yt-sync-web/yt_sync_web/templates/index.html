@@ -1,84 +1,48 @@
 <!DOCTYPE html>
-<html lang="fr" class="h-full bg-slate-900 text-slate-100">
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>yt-sync • Synchroniseur de Playlists</title>
-    <!-- HTMX 2.x CDN officiel -->
+    <title>yt-sync • YouTube Playlist Dashboard</title>
+    <!-- HTMX 2.x Official CDN -->
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-    <!-- Tailwind CSS pour un rendu soigné et moderne -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="min-h-full flex flex-col items-center py-10 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-4xl w-full space-y-8">
-        <!-- En-tête -->
-        <header class="text-center space-y-2">
-            <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-red-500 via-pink-500 to-purple-500 bg-clip-text text-transparent">
-                YouTube Playlist Synchronizer
-            </h1>
-            <p class="text-slate-400 text-sm sm:text-base">
-                Synchronisez vos playlists YouTube locales proprement, avec détection des suppressions et pistes inaccessibles.
-            </p>
+<body class="min-h-full flex flex-col items-center py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-5xl w-full space-y-6">
+        <!-- Main Top Bar -->
+        <header class="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-800 pb-5">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center text-xl shadow-lg shadow-purple-900/30">
+                    ⚡
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight text-white">
+                        yt-sync <span class="text-sm font-normal text-purple-400">Dashboard</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">
+                        Scoped folder YouTube playlist synchronization
+                    </p>
+                </div>
+            </div>
+
+            <!-- Target Folder Pill -->
+            {% if target_dir %}
+            <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3.5 py-1.5 rounded-full text-xs text-slate-300">
+                <span class="text-slate-500">Folder:</span>
+                <span class="font-mono text-purple-300 truncate max-w-xs sm:max-w-md">{{ target_dir }}</span>
+            </div>
+            {% endif %}
         </header>
 
-        <!-- Formulaire de configuration -->
-        <section class="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-xl p-6 shadow-xl">
-            <h2 class="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
-                <span>⚙️ Configuration de la synchronisation</span>
-            </h2>
-
-            <form id="sync-form"
-                  hx-post="/analyze"
-                  hx-target="#results-container"
-                  hx-swap="innerHTML"
-                  hx-indicator="#loading-indicator"
-                  class="space-y-4">
-
-                <div>
-                    <label for="target_dir" class="block text-sm font-medium text-slate-300">
-                        Dossier cible local
-                    </label>
-                    <input type="text"
-                           id="target_dir"
-                           name="target_dir"
-                           required
-                           placeholder="/chemin/vers/votre/dossier/musique"
-                           class="mt-1 block w-full rounded-lg bg-slate-900 border border-slate-700 px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500">
-                </div>
-
-                <div>
-                    <label for="playlist_url" class="block text-sm font-medium text-slate-300">
-                        URL de la playlist YouTube
-                    </label>
-                    <input type="url"
-                           id="playlist_url"
-                           name="playlist_url"
-                           required
-                           placeholder="https://www.youtube.com/playlist?list=PL..."
-                           class="mt-1 block w-full rounded-lg bg-slate-900 border border-slate-700 px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500">
-                </div>
-
-                <div class="flex items-center justify-between pt-2">
-                    <button type="submit"
-                            class="inline-flex items-center px-5 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium shadow-md transition">
-                        <span>🔍 Analyser la playlist</span>
-                    </button>
-
-                    <!-- Indicateur de chargement HTMX -->
-                    <div id="loading-indicator" class="htmx-indicator flex items-center gap-2 text-purple-400 text-sm">
-                        <svg class="animate-spin h-5 w-5 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                        </svg>
-                        <span>Extraction et analyse en cours...</span>
-                    </div>
-                </div>
-            </form>
-        </section>
-
-        <!-- Conteneur dynamique où les fragments HTMX sont injectés -->
-        <main id="results-container" class="transition-all">
-            <!-- Vide à l'ouverture, rempli via /analyze et /sync -->
+        <!-- Dynamic Content Container -->
+        <main id="dashboard-content" class="transition-all">
+            {% if init_needed %}
+                {% include "fragments/init_form.html" %}
+            {% else %}
+                {% include "fragments/dashboard.html" %}
+            {% endif %}
         </main>
     </div>
 </body>

@@ -65,14 +65,14 @@ class PlaylistExtractor:
     # Metadata extraction
     # ------------------------------------------------------------------
 
-    def fetch_playlist(self, url: str) -> list[RemoteTrack]:
-        """Fetch the list of tracks from a YouTube playlist without downloading.
+    def fetch_playlist_details(self, url: str) -> tuple[str, list[RemoteTrack]]:
+        """Fetch playlist title and tracks without downloading.
 
         Args:
             url: Complete URL of the YouTube playlist.
 
         Returns:
-            List of :class:`RemoteTrack` instances.
+            Tuple of (playlist_title, list_of_remote_tracks).
 
         Raises:
             ExtractionError: If yt-dlp fails to extract playlist info.
@@ -92,8 +92,24 @@ class PlaylistExtractor:
                 f"yt-dlp could not extract information for URL: {url}"
             )
 
+        title: str = info.get("title") or "YouTube Playlist"
         entries: list[dict[str, Any]] = info.get("entries") or []
-        return [_build_remote_track(e) for e in entries]
+        return title, [_build_remote_track(e) for e in entries]
+
+    def fetch_playlist(self, url: str) -> list[RemoteTrack]:
+        """Fetch the list of tracks from a YouTube playlist without downloading.
+
+        Args:
+            url: Complete URL of the YouTube playlist.
+
+        Returns:
+            List of :class:`RemoteTrack` instances.
+
+        Raises:
+            ExtractionError: If yt-dlp fails to extract playlist info.
+        """
+        _, tracks = self.fetch_playlist_details(url)
+        return tracks
 
     # ------------------------------------------------------------------
     # Targeted downloads
