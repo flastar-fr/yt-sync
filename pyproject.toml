@@ -1,0 +1,25 @@
+[project]
+name = "yt-sync-workspace"
+version = "0.1.0"
+description = "Workspace root for yt-sync"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv.workspace]
+members = [
+    "yt-sync-core",
+    "yt-sync-cli",
+    "yt-sync-web",
+]
+
+[tool.pytest.ini_options]
+testpaths = [
+    "yt-sync-core/tests",
+    "yt-sync-cli/tests",
+    "yt-sync-web/tests",
+]
+pythonpath = [
+    "yt-sync-core",
+    "yt-sync-cli",
+    "yt-sync-web",
+]

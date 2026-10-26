@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "yt-sync-core"
+version = "0.1.0"
+description = "Core domain and extraction logic for yt-sync"
+requires-python = ">=3.11"
+dependencies = [
+    "yt-dlp",
+    "pydantic",
+    "pytest",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["yt_sync_core"]

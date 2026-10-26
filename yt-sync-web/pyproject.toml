@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "yt-sync-web"
+version = "0.1.0"
+description = "Web interface and API for yt-sync"
+requires-python = ">=3.11"
+dependencies = [
+    "yt-sync-core",
+    "fastapi",
+    "uvicorn",
+    "jinja2",
+]
+
+[tool.uv.sources]
+yt-sync-core = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["yt_sync_web"]

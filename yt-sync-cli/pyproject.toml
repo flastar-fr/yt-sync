@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "yt-sync-cli"
+version = "0.1.0"
+description = "CLI interface for yt-sync"
+requires-python = ">=3.11"
+dependencies = [
+    "yt-sync-core",
+]
+
+[tool.uv.sources]
+yt-sync-core = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["yt_sync_cli"]
