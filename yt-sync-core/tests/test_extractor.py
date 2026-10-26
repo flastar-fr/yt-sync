@@ -1,0 +1,265 @@
+"""Tests unitaires pour PlaylistExtractor (extractor.py).
+
+Pattern : Arrange-Act-Assert (AAA)
+Isolation  : unittest.mock.patch / MagicMock — aucun appel réseau réel.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+from unittest.mock import MagicMock, call, patch
+
+import pytest
+
+from yt_sync_core.exceptions import ExtractionError
+from yt_sync_core.extractor import PlaylistExtractor, RemoteTrack
+
+
+# ---------------------------------------------------------------------------
+# Helpers / données de test
+# ---------------------------------------------------------------------------
+
+PLAYLIST_URL = "https://www.youtube.com/playlist?list=PL_FAKE"
+
+_FAKE_ENTRY_1: dict[str, Any] = {
+    "id": "vid001",
+    "title": "Track One",
+    "availability": "public",
+}
+_FAKE_ENTRY_2: dict[str, Any] = {
+    "id": "vid002",
+    "title": "Track Two",
+    "availability": "public",
+}
+_PRIVATE_ENTRY: dict[str, Any] = {
+    "id": "vid003",
+    "title": "[Private video]",
+    "availability": "private",
+}
+_DELETED_ENTRY: dict[str, Any] = {
+    "id": "vid004",
+    "title": "[Deleted video]",
+    "availability": "unavailable",
+}
+
+_FAKE_PLAYLIST_INFO: dict[str, Any] = {
+    "id": "PL_FAKE",
+    "title": "My Playlist",
+    "entries": [_FAKE_ENTRY_1, _FAKE_ENTRY_2],
+}
+
+
+def _make_ydl_mock(info: dict[str, Any] | None = None) -> MagicMock:
+    """Retourne un mock de YoutubeDL configuré pour renvoyer ``info``."""
+    mock_ydl = MagicMock()
+    mock_ydl.__enter__ = MagicMock(return_value=mock_ydl)
+    mock_ydl.__exit__ = MagicMock(return_value=False)
+    mock_ydl.extract_info.return_value = info
+    return mock_ydl
+
+
+# ---------------------------------------------------------------------------
+# RemoteTrack
+# ---------------------------------------------------------------------------
+
+
+class TestRemoteTrack:
+    """Vérifie la structure du dataclass RemoteTrack."""
+
+    def test_remote_track_creation(self) -> None:
+        # Arrange / Act
+        track = RemoteTrack(video_id="abc", title="My Title")
+        # Assert
+        assert track.video_id == "abc"
+        assert track.title == "My Title"
+
+    def test_remote_track_is_available_by_default(self) -> None:
+        track = RemoteTrack(video_id="abc", title="Title")
+        assert track.is_available is True
+
+    def test_remote_track_unavailable(self) -> None:
+        track = RemoteTrack(video_id="abc", title="[Deleted video]", is_available=False)
+        assert track.is_available is False
+
+    def test_two_remote_tracks_with_same_id_are_equal(self) -> None:
+        # Arrange
+        t1 = RemoteTrack(video_id="x", title="Title")
+        t2 = RemoteTrack(video_id="x", title="Title")
+        # Assert
+        assert t1 == t2
+
+
+# ---------------------------------------------------------------------------
+# PlaylistExtractor — fetch_playlist
+# ---------------------------------------------------------------------------
+
+
+class TestPlaylistExtractorFetchPlaylist:
+    """Tests de la méthode fetch_playlist."""
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_fetch_returns_list_of_remote_tracks(self, MockYDL: MagicMock) -> None:
+        # Arrange
+        MockYDL.return_value = _make_ydl_mock(_FAKE_PLAYLIST_INFO)
+        extractor = PlaylistExtractor()
+        # Act
+        tracks = extractor.fetch_playlist(PLAYLIST_URL)
+        # Assert
+        assert len(tracks) == 2
+        assert all(isinstance(t, RemoteTrack) for t in tracks)
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_fetch_maps_ids_and_titles_correctly(self, MockYDL: MagicMock) -> None:
+        # Arrange
+        MockYDL.return_value = _make_ydl_mock(_FAKE_PLAYLIST_INFO)
+        extractor = PlaylistExtractor()
+        # Act
+        tracks = extractor.fetch_playlist(PLAYLIST_URL)
+        # Assert
+        ids = {t.video_id for t in tracks}
+        titles = {t.title for t in tracks}
+        assert ids == {"vid001", "vid002"}
+        assert titles == {"Track One", "Track Two"}
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_fetch_marks_private_entry_as_unavailable(self, MockYDL: MagicMock) -> None:
+        # Arrange
+        info = {**_FAKE_PLAYLIST_INFO, "entries": [_PRIVATE_ENTRY]}
+        MockYDL.return_value = _make_ydl_mock(info)
+        extractor = PlaylistExtractor()
+        # Act
+        tracks = extractor.fetch_playlist(PLAYLIST_URL)
+        # Assert
+        assert len(tracks) == 1
+        assert tracks[0].is_available is False
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_fetch_marks_deleted_entry_as_unavailable(self, MockYDL: MagicMock) -> None:
+        # Arrange
+        info = {**_FAKE_PLAYLIST_INFO, "entries": [_DELETED_ENTRY]}
+        MockYDL.return_value = _make_ydl_mock(info)
+        extractor = PlaylistExtractor()
+        # Act
+        tracks = extractor.fetch_playlist(PLAYLIST_URL)
+        # Assert
+        assert tracks[0].is_available is False
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_fetch_empty_playlist_returns_empty_list(self, MockYDL: MagicMock) -> None:
+        # Arrange
+        info = {**_FAKE_PLAYLIST_INFO, "entries": []}
+        MockYDL.return_value = _make_ydl_mock(info)
+        extractor = PlaylistExtractor()
+        # Act
+        tracks = extractor.fetch_playlist(PLAYLIST_URL)
+        # Assert
+        assert tracks == []
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_fetch_raises_extraction_error_when_result_is_none(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        MockYDL.return_value = _make_ydl_mock(None)
+        extractor = PlaylistExtractor()
+        # Act / Assert
+        with pytest.raises(ExtractionError):
+            extractor.fetch_playlist(PLAYLIST_URL)
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_fetch_passes_ignoreerrors_option(self, MockYDL: MagicMock) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock(_FAKE_PLAYLIST_INFO)
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.fetch_playlist(PLAYLIST_URL)
+        # Assert : le constructeur reçoit bien ignoreerrors=True
+        call_kwargs = MockYDL.call_args[0][0]  # premier arg positionnel = opts dict
+        assert call_kwargs.get("ignoreerrors") is True
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_fetch_passes_extract_flat_option(self, MockYDL: MagicMock) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock(_FAKE_PLAYLIST_INFO)
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.fetch_playlist(PLAYLIST_URL)
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert call_kwargs.get("extract_flat") is True
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_fetch_calls_extract_info_with_url(self, MockYDL: MagicMock) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock(_FAKE_PLAYLIST_INFO)
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.fetch_playlist(PLAYLIST_URL)
+        # Assert
+        mock_ydl.extract_info.assert_called_once_with(PLAYLIST_URL, download=False)
+
+
+# ---------------------------------------------------------------------------
+# PlaylistExtractor — download_tracks
+# ---------------------------------------------------------------------------
+
+
+class TestPlaylistExtractorDownloadTracks:
+    """Tests de la méthode download_tracks."""
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_calls_ydl_download(self, MockYDL: MagicMock) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        video_ids = ["vid001", "vid002"]
+        # Act
+        extractor.download_tracks(video_ids, output_dir="/tmp/music")
+        # Assert
+        mock_ydl.download.assert_called_once()
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_passes_correct_urls(self, MockYDL: MagicMock) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        video_ids = ["vid001"]
+        # Act
+        extractor.download_tracks(video_ids, output_dir="/tmp/music")
+        # Assert : on vérifie que l'URL YouTube standard est passée
+        downloaded_urls: list[str] = mock_ydl.download.call_args[0][0]
+        assert "https://www.youtube.com/watch?v=vid001" in downloaded_urls
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_empty_list_does_not_call_download(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.download_tracks([], output_dir="/tmp/music")
+        # Assert
+        mock_ydl.download.assert_not_called()
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_progress_callback_is_registered(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        callback = MagicMock()
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.download_tracks(["vid001"], output_dir="/tmp/music", progress_callback=callback)
+        # Assert : les options passées à YDL contiennent un progress_hook
+        call_kwargs = MockYDL.call_args[0][0]
+        assert "progress_hooks" in call_kwargs
+        assert len(call_kwargs["progress_hooks"]) > 0

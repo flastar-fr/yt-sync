@@ -21,3 +21,7 @@ class StateWriteError(StorageError):
 
 class StateCorruptedError(StorageError):
     """Le fichier d'état existe mais son contenu est invalide (JSON malformé, schéma incorrect…)."""
+
+
+class ExtractionError(YtSyncError):
+    """Erreur lors de l'extraction d'informations via yt-dlp (URL invalide, réponse vide…)."""
