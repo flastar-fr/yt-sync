@@ -4,6 +4,28 @@ A modular, multi-package Python workspace powered by [uv](https://docs.astral.sh
 
 ---
 
+## About This Project (100% Vibe Coded Experiment)
+
+This project is an experiment: building a complete, production-ready software solution answering a personal need through **100% vibe coding**, without performing manual code reviews on the generated code.
+
+The goal was to test how far modern agentic workflows can go when guided strictly through engineering constraints and test suites rather than direct code intervention.
+
+You can consider everything (this README included) vibe coded.
+
+### Development Workflow & Methodology
+1. **Architectural Scaffolding & Prompt Engineering (Gemini Web UI):**
+   - High-level design and phased prompt generation were drafted iteratively in the Gemini web interface.
+   - Enforced modern software engineering standards from prompt #1: strict **SOLID** principles, **DRY**, Python 3.12+ type hints, and **Test-Driven Development (TDD)** using the **AAA (Arrange-Act-Assert)** pattern without complex logic in tests.
+   - Decoupled business logic into an isolated core package, keeping CLI and web layers strictly dependent on domain outputs.
+2. **Autonomous Execution (Antigravity CLI):**
+   - Implemented via **Antigravity CLI** in an incremental, atomic-commit workflow.
+   - Model allocation strategy:
+     - **Flash 3.8 (Low/Medium/High thinking)** for structural scaffolding, setup, and iterative logic.
+     - **Sonnet 4.6** for multi-package coordination, test-driven implementations, and FastAPI/HTMX 2 component wiring.
+   - Quality gates were validated exclusively through test execution (`uv run pytest` passing 105+ tests with 0 warnings).
+
+---
+
 ## Workspace Structure
 
 The project adopts a flat layout (no `src/` folder), divided into three complementary packages:
