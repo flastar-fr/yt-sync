@@ -94,13 +94,13 @@ Run the CLI directly using `uv` with the package module:
 uv run --package yt-sync-cli python -m yt_sync_cli --help
 
 # Run the CLI targeting a destination folder (interactive or with configured state):
-uv run --package yt-sync-cli python -m yt_sync_cli /chemin/vers/musiques
+uv run --package yt-sync-cli python -m yt_sync_cli /path/to/music_dir
 
 # Run initial synchronization with folder and YouTube playlist URL:
-uv run --package yt-sync-cli python -m yt_sync_cli /chemin/vers/musiques "https://www.youtube.com/playlist?list=PL..."
+uv run --package yt-sync-cli python -m yt_sync_cli /path/to/music_dir "[https://www.youtube.com/playlist?list=PL](https://www.youtube.com/playlist?list=PL)..."
 
 # Run differential analysis only (dry-run mode without downloading):
-uv run --package yt-sync-cli python -m yt_sync_cli /chemin/vers/musiques "https://www.youtube.com/playlist?list=PL..." --dry-run
+uv run --package yt-sync-cli python -m yt_sync_cli /path/to/music_dir "[https://www.youtube.com/playlist?list=PL](https://www.youtube.com/playlist?list=PL)..." --dry-run
 ```
 
 ---
