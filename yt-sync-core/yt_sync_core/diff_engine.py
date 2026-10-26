@@ -1,13 +1,13 @@
-"""Moteur d'analyse différentielle entre état local et playlist distante."""
+"""Pure differential analysis engine comparing remote playlist with local state."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from yt_sync_core.extractor import RemoteTrack
 from yt_sync_core.models import SyncState, TrackSnapshot, TrackStatus
 
-# Statuts considérés comme "déjà traités" → on ne re-télécharge pas
+# Statuses considered processed and stable -> will not be re-downloaded
 _STABLE_STATUSES: frozenset[TrackStatus] = frozenset(
     {TrackStatus.DOWNLOADED, TrackStatus.SKIPPED}
 )
@@ -15,17 +15,16 @@ _STABLE_STATUSES: frozenset[TrackStatus] = frozenset(
 
 @dataclass
 class DiffResult:
-    """Résultat de l'analyse différentielle.
+    """Differential analysis result.
 
     Attributes:
-        already_downloaded: Pistes déjà présentes localement (DOWNLOADED ou SKIPPED)
-            et toujours disponibles dans la playlist distante.
-        new_tracks: Pistes présentes dans la playlist distante mais absentes ou
-            en erreur / en attente localement → à télécharger.
-        removed_tracks: Pistes connues localement mais absentes de la playlist
-            distante (retirées de la playlist par le propriétaire).
-        unavailable_tracks: Pistes présentes dans la playlist distante mais
-            marquées comme indisponibles (privées, supprimées…).
+        already_downloaded: Tracks already present locally (DOWNLOADED or SKIPPED)
+            and still present in the remote playlist.
+        new_tracks: Tracks present remotely but missing or in error/pending status
+            locally -> ready to download.
+        removed_tracks: Tracks known locally but no longer present in the remote playlist.
+        unavailable_tracks: Tracks present in the remote playlist but flagged as
+            unavailable (private, deleted, removed...).
     """
 
     already_downloaded: list[TrackSnapshot]
@@ -35,7 +34,7 @@ class DiffResult:
 
     @property
     def total_count(self) -> int:
-        """Nombre total de pistes réparties dans les quatre catégories."""
+        """Total count of tracks across all four categories."""
         return (
             len(self.already_downloaded)
             + len(self.new_tracks)
@@ -45,10 +44,10 @@ class DiffResult:
 
 
 class DiffEngine:
-    """Calcule la différence entre l'état distant et l'état local.
+    """Computes differences between remote playlist tracks and local SyncState.
 
-    La classe est **pure** : elle ne lit ni n'écrit aucun fichier, ne fait
-    aucun appel réseau et ne produit aucun effet de bord.
+    This engine is pure and deterministic: it does not perform I/O, network calls,
+    or mutate any input states.
     """
 
     def compute(
@@ -57,14 +56,14 @@ class DiffEngine:
         remote_tracks: list[RemoteTrack],
         current_state: SyncState,
     ) -> DiffResult:
-        """Compare la playlist distante à l'état local et classifie les pistes.
+        """Compare the remote playlist against local state and classify tracks.
 
         Args:
-            remote_tracks: Liste des pistes telles que vues depuis YouTube.
-            current_state: État de synchronisation local courant.
+            remote_tracks: List of remote tracks fetched from YouTube.
+            current_state: Current local synchronization state.
 
         Returns:
-            Un :class:`DiffResult` avec les quatre listes remplies.
+            A :class:`DiffResult` instance containing classified tracks.
         """
         local_snapshots: dict[str, TrackSnapshot] = dict(current_state.tracks)
         remote_by_id: dict[str, RemoteTrack] = {t.video_id: t for t in remote_tracks}
@@ -74,10 +73,10 @@ class DiffEngine:
         removed_tracks: list[TrackSnapshot] = []
         unavailable_tracks: list[TrackSnapshot] = []
 
-        # --- Analyse de chaque piste distante ---
+        # --- Inspect remote tracks ---
         for remote in remote_tracks:
             if not remote.is_available:
-                # Récupère le vrai titre via le snapshot si on le connaît
+                # Recover original known title from local snapshot if available
                 snapshot = local_snapshots.get(remote.video_id)
                 known_title = snapshot.title if snapshot else remote.title
                 unavailable_tracks.append(
@@ -85,7 +84,7 @@ class DiffEngine:
                         video_id=remote.video_id,
                         title=known_title,
                         status=TrackStatus.ERROR,
-                        error_message="Piste indisponible sur YouTube",
+                        error_message="Track unavailable on YouTube",
                     )
                 )
                 continue
@@ -95,10 +94,10 @@ class DiffEngine:
             if snapshot is not None and snapshot.status in _STABLE_STATUSES:
                 already_downloaded.append(snapshot)
             else:
-                # Absent du state, ou en PENDING / ERROR → à télécharger
+                # Absent from state, or in PENDING / ERROR status -> download
                 new_tracks.append(remote)
 
-        # --- Pistes locales absentes de la playlist distante ---
+        # --- Identify tracks removed from remote playlist ---
         remote_ids: frozenset[str] = frozenset(remote_by_id.keys())
         for video_id, snapshot in local_snapshots.items():
             if video_id not in remote_ids:

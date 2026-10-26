@@ -1,4 +1,4 @@
-"""Tests unitaires pour l'interface CLI de yt-sync."""
+"""Unit tests for the yt-sync command-line interface."""
 
 from __future__ import annotations
 
@@ -10,10 +10,9 @@ import pytest
 from yt_sync_cli import __version__
 from yt_sync_cli.main import build_parser, run_sync
 from yt_sync_core import __version__ as core_version
-from yt_sync_core.diff_engine import DiffResult
 from yt_sync_core.exceptions import ExtractionError
 from yt_sync_core.extractor import RemoteTrack
-from yt_sync_core.models import TrackSnapshot, TrackStatus
+from yt_sync_core.models import TrackStatus
 from yt_sync_core.storage import STATE_FILENAME, StateManager
 
 
@@ -23,7 +22,7 @@ def test_cli_version() -> None:
 
 
 class TestCLIParser:
-    """Vérifie le parsing des arguments en ligne de commande."""
+    """Validate command-line argument parsing."""
 
     def test_parser_with_required_args(self) -> None:
         # Arrange
@@ -51,7 +50,7 @@ class TestCLIParser:
 
 
 class TestCLIRunSync:
-    """Vérifie le flux d'exécution de run_sync."""
+    """Validate run_sync execution flow."""
 
     def test_run_sync_creates_directory_and_saves_state(self, tmp_path: Path) -> None:
         # Arrange

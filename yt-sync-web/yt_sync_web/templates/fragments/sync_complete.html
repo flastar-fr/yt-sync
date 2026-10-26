@@ -1,0 +1,29 @@
+<div class="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-xl p-6 shadow-xl space-y-5">
+    <div class="flex items-center gap-3 border-b border-slate-700 pb-4">
+        <span class="text-3xl">🎉</span>
+        <div>
+            <h2 class="text-xl font-bold text-slate-100">Synchronisation terminée avec succès !</h2>
+            <p class="text-xs text-slate-400 mt-1">Dossier : <span class="font-mono text-purple-300">{{ target_dir }}</span></p>
+        </div>
+    </div>
+
+    <div class="bg-emerald-950/40 border border-emerald-500/40 rounded-lg p-4 space-y-2 text-sm text-emerald-200">
+        <p><strong>{{ downloaded_count }}</strong> nouvelle(s) piste(s) téléchargée(s) et enregistrée(s).</p>
+        <p class="text-xs text-emerald-300/80">L'état local <code class="font-mono bg-emerald-900/50 px-1 py-0.5 rounded">.yt_sync_state.json</code> a été mis à jour avec un total de <strong>{{ total_indexed }}</strong> pistes.</p>
+    </div>
+
+    <!-- Ré-analyse automatique possible -->
+    <div class="pt-2 flex gap-3">
+        <form hx-post="/analyze"
+              hx-target="#results-container"
+              hx-swap="innerHTML"
+              hx-indicator="#loading-indicator">
+            <input type="hidden" name="target_dir" value="{{ target_dir }}">
+            <input type="hidden" name="playlist_url" value="{{ playlist_url }}">
+            <button type="submit"
+                    class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium transition flex items-center gap-2">
+                <span>🔄 Ré-analyser la playlist</span>
+            </button>
+        </form>
+    </div>
+</div>

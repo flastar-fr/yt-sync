@@ -1,4 +1,4 @@
-"""Persistence de l'état de synchronisation (StateManager)."""
+"""Persistence layer for synchronization state (StateManager)."""
 
 from __future__ import annotations
 
@@ -14,53 +14,51 @@ STATE_FILENAME: str = ".yt_sync_state.json"
 
 
 class StateManager:
-    """Gère la lecture et l'écriture de l'état dans un dossier cible.
+    """Manages reading and writing state in a target directory.
 
-    Le fichier d'état est un fichier JSON caché nommé :data:`STATE_FILENAME`
-    placé directement à la racine du ``target_dir``.
+    The state file is a hidden JSON file named :data:`STATE_FILENAME`
+    located directly at the root of ``target_dir``.
 
     Args:
-        target_dir: Chemin vers le dossier cible (doit exister).
+        target_dir: Path to the target directory (must exist).
 
     Raises:
-        FileNotFoundError: Si ``target_dir`` n'existe pas.
+        FileNotFoundError: If ``target_dir`` does not exist.
     """
 
     def __init__(self, *, target_dir: Path) -> None:
         if not target_dir.exists():
-            raise FileNotFoundError(f"Le dossier cible n'existe pas : {target_dir}")
+            raise FileNotFoundError(f"Target directory does not exist: {target_dir}")
         self._target_dir = target_dir
 
     # ------------------------------------------------------------------
-    # Propriétés publiques
+    # Public properties
     # ------------------------------------------------------------------
 
     @property
     def target_dir(self) -> Path:
-        """Dossier cible surveillé par ce manager."""
+        """Target directory managed by this instance."""
         return self._target_dir
 
     @property
     def state_file_path(self) -> Path:
-        """Chemin absolu vers le fichier d'état."""
+        """Absolute path to the state file."""
         return self._target_dir / STATE_FILENAME
 
     # ------------------------------------------------------------------
-    # API publique
+    # Public API
     # ------------------------------------------------------------------
 
     def load(self) -> SyncState:
-        """Charge l'état depuis le fichier JSON.
+        """Load state from the JSON file.
 
         Returns:
-            Un :class:`SyncState` vide si le fichier est absent,
-            ou l'état désérialisé depuis le fichier.
+            An empty :class:`SyncState` if the file does not exist,
+            or the deserialized state from disk.
 
         Raises:
-            StateReadError: Si le fichier existe mais ne peut pas être lu
-                (problème de permissions ou d'I/O).
-            StateCorruptedError: Si le fichier existe mais son contenu est
-                invalide (JSON malformé ou schéma Pydantic non respecté).
+            StateReadError: If the file exists but cannot be read.
+            StateCorruptedError: If the file contains invalid JSON or schema violations.
         """
         path = self.state_file_path
 
@@ -70,31 +68,31 @@ class StateManager:
         try:
             raw = path.read_text(encoding="utf-8")
         except OSError as exc:
-            raise StateReadError(f"Impossible de lire {path}: {exc}") from exc
+            raise StateReadError(f"Cannot read state file {path}: {exc}") from exc
 
         try:
             return SyncState.model_validate_json(raw)
         except (ValueError, ValidationError) as exc:
             raise StateCorruptedError(
-                f"Fichier d'état corrompu ({path}): {exc}"
+                f"Corrupted state file ({path}): {exc}"
             ) from exc
 
     def save(self, state: SyncState) -> None:
-        """Persiste l'état dans le fichier JSON.
+        """Persist state to the JSON file.
 
         Args:
-            state: L'état à sauvegarder.
+            state: The state instance to persist.
 
         Raises:
-            StateWriteError: Si l'écriture échoue (permissions, disque plein…).
+            StateWriteError: If writing to disk fails.
         """
         path = self.state_file_path
         json_bytes = state.model_dump_json(indent=2).encode("utf-8")
 
         try:
-            # Écriture atomique via un fichier temporaire dans le même dossier
+            # Atomic write via a temporary file in the same directory
             tmp_path = path.with_suffix(".tmp")
             tmp_path.write_bytes(json_bytes)
             os.replace(tmp_path, path)
         except OSError as exc:
-            raise StateWriteError(f"Impossible d'écrire {path}: {exc}") from exc
+            raise StateWriteError(f"Cannot write state file {path}: {exc}") from exc

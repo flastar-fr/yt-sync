@@ -1,14 +1,14 @@
-"""Modèles Pydantic v2 pour yt_sync_core."""
+"""Pydantic v2 models for yt_sync_core."""
 
 from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 class TrackStatus(str, Enum):
-    """Statut de synchronisation d'une piste."""
+    """Synchronization status of a track."""
 
     PENDING = "pending"
     DOWNLOADED = "downloaded"
@@ -17,14 +17,13 @@ class TrackStatus(str, Enum):
 
 
 class TrackSnapshot(BaseModel):
-    """Représentation immuable de l'état d'une piste à un instant donné.
+    """Immutable representation of a track's state at a given time.
 
     Attributes:
-        video_id: Identifiant YouTube unique (non vide).
-        title: Titre de la vidéo (non vide).
-        status: Statut courant de la piste.
-        error_message: Message d'erreur optionnel, présent uniquement si
-            ``status == TrackStatus.ERROR``.
+        video_id: Unique YouTube video identifier (non-empty).
+        title: Title of the video (non-empty).
+        status: Current synchronization status.
+        error_message: Optional error message, populated when status is ERROR.
     """
 
     video_id: str = Field(..., min_length=1)
@@ -36,10 +35,10 @@ class TrackSnapshot(BaseModel):
 
 
 class SyncState(BaseModel):
-    """État global de synchronisation d'un dossier cible.
+    """Global synchronization state for a target directory.
 
     Attributes:
-        tracks: Dictionnaire ``{video_id: TrackSnapshot}``.
+        tracks: Mapping of video_id to TrackSnapshot.
     """
 
     tracks: dict[str, TrackSnapshot] = Field(default_factory=dict)

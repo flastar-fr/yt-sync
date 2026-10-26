@@ -1,27 +1,27 @@
-"""Hiérarchie d'exceptions métier pour yt_sync_core."""
+"""Business exception hierarchy for yt_sync_core."""
 
 from __future__ import annotations
 
 
 class YtSyncError(Exception):
-    """Exception racine pour toutes les erreurs de yt-sync."""
+    """Base exception for all yt-sync errors."""
 
 
 class StorageError(YtSyncError):
-    """Erreur liée à la persistence de l'état."""
+    """Exception related to state persistence."""
 
 
 class StateReadError(StorageError):
-    """Impossible de lire le fichier d'état (permissions, I/O…)."""
+    """Raised when the state file cannot be read (permissions, I/O errors...)."""
 
 
 class StateWriteError(StorageError):
-    """Impossible d'écrire le fichier d'état (permissions, disque plein…)."""
+    """Raised when the state file cannot be written (permissions, disk full...)."""
 
 
 class StateCorruptedError(StorageError):
-    """Le fichier d'état existe mais son contenu est invalide (JSON malformé, schéma incorrect…)."""
+    """Raised when the state file exists but contains invalid data (corrupted JSON, invalid schema...)."""
 
 
 class ExtractionError(YtSyncError):
-    """Erreur lors de l'extraction d'informations via yt-dlp (URL invalide, réponse vide…)."""
+    """Raised when metadata extraction via yt-dlp fails (invalid URL, network error...)."""
