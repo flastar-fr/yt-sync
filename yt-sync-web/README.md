@@ -19,10 +19,10 @@ Folder-scoped web dashboard and REST endpoints for `yt-sync` built with FastAPI,
 Start the web server targeting a specific folder:
 
 ```bash
-uv run --package yt-sync-web python -m yt_sync_web /chemin/vers/musiques
+uv run --package yt-sync-web python -m yt_sync_web /path/to/music_dir
 
 # Optional custom host and port:
-uv run --package yt-sync-web python -m yt_sync_web /chemin/vers/musiques --host 127.0.0.1 --port 8000
+uv run --package yt-sync-web python -m yt_sync_web /path/to/music_dir --host 127.0.0.1 --port 8000
 ```
 
 Navigate to `http://127.0.0.1:8000` in your web browser.

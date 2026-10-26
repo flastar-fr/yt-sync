@@ -11,13 +11,13 @@ Command-line interface for `yt-sync`.
 uv run --package yt-sync-cli python -m yt_sync_cli --help
 
 # Run targeting a destination folder (interactive or with configured state)
-uv run --package yt-sync-cli python -m yt_sync_cli /chemin/vers/musiques
+uv run --package yt-sync-cli python -m yt_sync_cli /path/to/music_dir 
 
 # Run with target folder and YouTube playlist URL
-uv run --package yt-sync-cli python -m yt_sync_cli /chemin/vers/musiques "https://www.youtube.com/playlist?list=PL..."
+uv run --package yt-sync-cli python -m yt_sync_cli /path/to/music_dir "https://www.youtube.com/playlist?list=PL..."
 
 # Differential check without downloading (dry-run)
-uv run --package yt-sync-cli python -m yt_sync_cli /chemin/vers/musiques "https://www.youtube.com/playlist?list=PL..." --dry-run
+uv run --package yt-sync-cli python -m yt_sync_cli /path/to/music_dir "https://www.youtube.com/playlist?list=PL..." --dry-run
 ```
 
 ---
