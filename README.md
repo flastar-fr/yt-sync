@@ -45,7 +45,7 @@ uv sync --all-packages
 
 ## Testing
 
-Run all unit and integration tests across all packages:
+Run the full unit and integration test suite across all workspace packages:
 
 ```bash
 uv run pytest
@@ -61,30 +61,46 @@ uv run pytest yt-sync-web/tests/
 
 ---
 
-## Usage
+## Command Guide & Execution
 
-### Command-Line Interface (CLI)
+### 1. Command-Line Interface (CLI)
 
-```bash
-# Display help and usage information
-uv run --package yt-sync-cli python -m yt_sync_cli.main --help
-
-# Run a dry-run analysis without downloading
-uv run --package yt-sync-cli python -m yt_sync_cli.main ./music "https://www.youtube.com/playlist?list=PL..." --dry-run
-
-# Run full synchronization
-uv run --package yt-sync-cli python -m yt_sync_cli.main ./music "https://www.youtube.com/playlist?list=PL..."
-```
-
-### Web Application
-
-Start the local server scoped to a target directory:
+Run the CLI directly using `uv` with the package module:
 
 ```bash
-uv run --package yt-sync-web python -m yt_sync_web.main /path/to/my_folder
+# Display help and usage options
+uv run --package yt-sync-cli python -m yt_sync_cli --help
 
-# Optional custom host and port:
-uv run --package yt-sync-web python -m yt_sync_web.main /path/to/my_folder --host 127.0.0.1 --port 8000
+# Run the CLI targeting a destination folder (interactive or with configured state):
+uv run --package yt-sync-cli python -m yt_sync_cli /chemin/vers/musiques
+
+# Run initial synchronization with folder and YouTube playlist URL:
+uv run --package yt-sync-cli python -m yt_sync_cli /chemin/vers/musiques "https://www.youtube.com/playlist?list=PL..."
+
+# Run differential analysis only (dry-run mode without downloading):
+uv run --package yt-sync-cli python -m yt_sync_cli /chemin/vers/musiques "https://www.youtube.com/playlist?list=PL..." --dry-run
 ```
 
-Navigate to `http://127.0.0.1:8000` in your web browser.
+---
+
+### 2. Web Application (FastAPI / HTMX 2)
+
+#### Run scoped to a target directory:
+
+```bash
+uv run --package yt-sync-web python -m yt_sync_web /chemin/vers/musiques
+```
+
+Custom host and port can also be specified:
+
+```bash
+uv run --package yt-sync-web python -m yt_sync_web /chemin/vers/musiques --host 127.0.0.1 --port 8000
+```
+
+Once started, navigate to **`http://127.0.0.1:8000`** in your web browser.
+
+#### (Optional) Run with Uvicorn development reload mode:
+
+```bash
+uv run --package yt-sync-web uvicorn yt_sync_web.__main__:app --reload
+```

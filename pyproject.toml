@@ -23,3 +23,6 @@ pythonpath = [
     "yt-sync-cli",
     "yt-sync-web",
 ]
+filterwarnings = [
+    "ignore:.*Using `httpx` with `starlette.testclient` is deprecated.*:UserWarning",
+]

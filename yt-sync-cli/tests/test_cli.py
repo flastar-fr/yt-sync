@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from yt_sync_cli import __version__
-from yt_sync_cli.main import build_parser, run_sync
+from yt_sync_cli.__main__ import build_parser, run_sync
 from yt_sync_core import __version__ as core_version
 from yt_sync_core.exceptions import ExtractionError
 from yt_sync_core.extractor import RemoteTrack

@@ -13,7 +13,7 @@ from yt_sync_core.extractor import RemoteTrack
 from yt_sync_core.models import SyncState, TrackSnapshot, TrackStatus
 from yt_sync_core.storage import STATE_FILENAME, StateManager
 from yt_sync_web import __version__
-from yt_sync_web.main import app
+from yt_sync_web.__main__ import app
 
 
 def test_web_version() -> None:
@@ -47,7 +47,7 @@ class TestWebDashboard:
         assert "Initialize Folder Synchronization" in response.text
         assert 'hx-post="/initialize"' in response.text
 
-    @patch("yt_sync_web.main.PlaylistExtractor")
+    @patch("yt_sync_web.__main__.PlaylistExtractor")
     def test_get_index_loads_local_state_without_network_when_state_exists(
         self, mock_extractor_class: MagicMock, client: TestClient, tmp_path: Path
     ) -> None:
@@ -85,7 +85,7 @@ class TestWebDashboard:
         assert "Check for Updates" in response.text
         assert 'hx-post="/refresh"' in response.text
 
-    @patch("yt_sync_web.main.PlaylistExtractor")
+    @patch("yt_sync_web.__main__.PlaylistExtractor")
     def test_post_initialize_creates_state_and_returns_dashboard(
         self, mock_extractor_class: MagicMock, client: TestClient, tmp_path: Path
     ) -> None:
@@ -121,7 +121,7 @@ class TestWebDashboard:
         assert loaded.tracks["rk1"].status == TrackStatus.PENDING
         assert loaded.tracks["rk2"].status == TrackStatus.ERROR
 
-    @patch("yt_sync_web.main.PlaylistExtractor")
+    @patch("yt_sync_web.__main__.PlaylistExtractor")
     def test_post_refresh_manual_polling_returns_diff_dashboard(
         self, mock_extractor_class: MagicMock, client: TestClient, tmp_path: Path
     ) -> None:
@@ -161,7 +161,7 @@ class TestWebDashboard:
         assert "New" in response.text
         assert 'Sync Missing Tracks' in response.text
 
-    @patch("yt_sync_web.main.PlaylistExtractor")
+    @patch("yt_sync_web.__main__.PlaylistExtractor")
     def test_post_sync_downloads_missing_tracks_and_updates_state(
         self, mock_extractor_class: MagicMock, client: TestClient, tmp_path: Path
     ) -> None:

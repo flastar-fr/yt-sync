@@ -28,7 +28,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "playlist_url",
         type=str,
-        help="URL of the YouTube playlist to synchronize.",
+        nargs="?",
+        default=None,
+        help="URL of the YouTube playlist to synchronize (optional if already configured in state).",
     )
     parser.add_argument(
         "--dry-run",
@@ -88,7 +90,7 @@ def progress_hook(status_dict: dict[str, Any]) -> None:
 
 def run_sync(
     target_dir: Path,
-    playlist_url: str,
+    playlist_url: str | None = None,
     *,
     dry_run: bool = False,
     extractor: PlaylistExtractor | None = None,
@@ -103,7 +105,6 @@ def run_sync(
     state_manager = StateManager(target_dir=target_dir)
 
     print(f"📁 Target folder: {target_dir}")
-    print(f"🔗 Playlist URL: {playlist_url}")
 
     # 2. Load local state
     try:
@@ -112,10 +113,18 @@ def run_sync(
         print(f"❌ Error loading local state: {exc}", file=sys.stderr)
         return 1
 
+    # Resolve playlist URL
+    effective_url = playlist_url or current_state.playlist_url
+    if not effective_url:
+        print("❌ Error: Playlist URL must be provided or configured in the local state.", file=sys.stderr)
+        return 1
+
+    print(f"🔗 Playlist URL: {effective_url}")
+
     # 3. Remote extraction and differential analysis
     print("🔍 Checking playlist diff...")
     try:
-        remote_tracks = extractor.fetch_playlist(playlist_url)
+        remote_tracks = extractor.fetch_playlist(effective_url)
     except ExtractionError as exc:
         print(f"❌ Error extracting playlist: {exc}", file=sys.stderr)
         return 1
@@ -174,7 +183,7 @@ def run_sync(
 
     # 6. Save updated synchronization state
     new_state = SyncState(
-        playlist_url=playlist_url,
+        playlist_url=effective_url,
         last_synced_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         tracks=updated_tracks,
     )

@@ -8,13 +8,16 @@ Command-line interface for `yt-sync`.
 
 ```bash
 # Display options
-uv run --package yt-sync-cli python -m yt_sync_cli.main --help
+uv run --package yt-sync-cli python -m yt_sync_cli --help
 
-# Differential check without downloading
-uv run --package yt-sync-cli python -m yt_sync_cli.main /path/to/folder "https://www.youtube.com/playlist?list=PL..." --dry-run
+# Run targeting a destination folder (interactive or with configured state)
+uv run --package yt-sync-cli python -m yt_sync_cli /chemin/vers/musiques
 
-# Run synchronization
-uv run --package yt-sync-cli python -m yt_sync_cli.main /path/to/folder "https://www.youtube.com/playlist?list=PL..."
+# Run with target folder and YouTube playlist URL
+uv run --package yt-sync-cli python -m yt_sync_cli /chemin/vers/musiques "https://www.youtube.com/playlist?list=PL..."
+
+# Differential check without downloading (dry-run)
+uv run --package yt-sync-cli python -m yt_sync_cli /chemin/vers/musiques "https://www.youtube.com/playlist?list=PL..." --dry-run
 ```
 
 ---
