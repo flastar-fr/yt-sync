@@ -41,12 +41,19 @@ yt_sync/
 
 ---
 
-## Features
+## Features & Roadmap
 
-- **Differential Analysis (`DiffEngine`)**: Computes exact diffs between remote playlists and local states without redownloading existing tracks.
-- **Unavailable Tracks Recovery**: Tracks that became private or deleted on YouTube are flagged while retaining their last known original title.
-- **Atomic State Persistence**: Local state is tracked in `.yt_sync_state.json` via atomic writes (`os.replace`) to avoid corruption.
-- **Multiple Interfaces**: Choose between a fast terminal CLI with progress reporting or an interactive web dashboard using HTMX 2.
+### Implemented Features
+- [x] **Flat Layout Workspace**: Independent packages orchestrated seamlessly via `uv workspaces`.
+- [x] **Differential Analysis (`DiffEngine`)**: Computes exact diffs between remote playlists and local states without redownloading existing tracks.
+- [x] **Unavailable Tracks Recovery**: Tracks that became private or deleted on YouTube are flagged while retaining their last known original title.
+- [x] **Atomic State Persistence**: Local state is tracked in `.yt_sync_state.json` via atomic writes (`os.replace`) to avoid corruption.
+- [x] **Multiple Interfaces**: Fast terminal CLI with progress reporting and interactive web dashboard using HTMX 2 with manual polling.
+- [x] **Comprehensive Test Suite**: 100% unit-tested core logic adhering to the AAA pattern (105+ tests, 0 warnings).
+
+### Roadmap (Planned Features)
+- [ ] **Audio Loudness Normalization (Equalizer / Volume Leveler)**: Normalize audio levels across downloaded tracks (e.g., EBU R128 / ReplayGain post-processing) so all songs play at a consistent perceived volume.
+- [ ] **Configurable Audio Trimming (Intro & Outro Cut)**: Download tracks starting from *n* seconds/minutes or trim long silent/talking intros and outros.
 
 ---
 
@@ -97,10 +104,10 @@ uv run --package yt-sync-cli python -m yt_sync_cli --help
 uv run --package yt-sync-cli python -m yt_sync_cli /path/to/music_dir
 
 # Run initial synchronization with folder and YouTube playlist URL:
-uv run --package yt-sync-cli python -m yt_sync_cli /path/to/music_dir "[https://www.youtube.com/playlist?list=PL](https://www.youtube.com/playlist?list=PL)..."
+uv run --package yt-sync-cli python -m yt_sync_cli /path/to/music_dir "https://www.youtube.com/playlist?list=PL..."
 
 # Run differential analysis only (dry-run mode without downloading):
-uv run --package yt-sync-cli python -m yt_sync_cli /path/to/music_dir "[https://www.youtube.com/playlist?list=PL](https://www.youtube.com/playlist?list=PL)..." --dry-run
+uv run --package yt-sync-cli python -m yt_sync_cli /path/to/music_dir "https://www.youtube.com/playlist?list=PL..." --dry-run
 ```
 
 ---
@@ -119,7 +126,7 @@ Custom host and port can also be specified:
 uv run --package yt-sync-web python -m yt_sync_web /path/to/music_dir --host 127.0.0.1 --port 8000
 ```
 
-Once started, navigate to **`http://127.0.0.1:8000`** in your web browser.
+Once started, navigate to **`[http://127.0.0.1:8000](http://127.0.0.1:8000)`** in your web browser.
 
 #### (Optional) Run with Uvicorn development reload mode:
 
