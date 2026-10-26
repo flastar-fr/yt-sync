@@ -1,48 +1,66 @@
-<div class="bg-slate-800/90 border border-slate-700 rounded-xl p-8 shadow-xl max-w-2xl mx-auto space-y-6">
-    <div class="text-center space-y-2 border-b border-slate-700/80 pb-5">
-        <span class="text-4xl">🚀</span>
-        <h2 class="text-2xl font-bold text-slate-100">Initialize Folder Synchronization</h2>
-        <p class="text-slate-400 text-sm">
-            No synchronization state found in this folder. Enter the YouTube playlist URL to link with this directory.
-        </p>
-    </div>
-
-    <div class="bg-slate-900/60 border border-slate-700 rounded-lg p-4 text-xs space-y-1">
-        <span class="font-semibold text-slate-400 uppercase tracking-wider">Scoped Target Directory:</span>
-        <div class="font-mono text-purple-300 break-all">{{ target_dir }}</div>
-    </div>
-
-    <form hx-post="/initialize"
-          hx-target="#dashboard-content"
-          hx-swap="innerHTML"
-          hx-indicator="#init-spinner"
-          class="space-y-4">
-
-        <div>
-            <label for="playlist_url" class="block text-sm font-medium text-slate-300">
-                YouTube Playlist URL
-            </label>
-            <input type="url"
-                   id="playlist_url"
-                   name="playlist_url"
-                   required
-                   placeholder="https://www.youtube.com/playlist?list=PL..."
-                   class="mt-1 block w-full rounded-lg bg-slate-900 border border-slate-700 px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
-        </div>
-
-        <div class="flex items-center justify-between pt-3">
-            <button type="submit"
-                    class="px-6 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium text-sm transition shadow-md flex items-center gap-2">
-                <span>🔗 Link & Load Playlist</span>
-            </button>
-
-            <div id="init-spinner" class="htmx-indicator flex items-center gap-2 text-purple-400 text-sm">
-                <svg class="animate-spin h-5 w-5 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+<!-- Init Card -->
+<div class="relative bg-zinc-900/40 backdrop-blur-xl border border-white/10 rounded-2xl p-8 max-w-xl mx-auto shadow-2xl overflow-hidden">
+    <!-- Subtle glow effect -->
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[80%] h-32 bg-indigo-500/10 blur-[60px] pointer-events-none"></div>
+    
+    <div class="relative z-10 flex flex-col gap-8">
+        <!-- Header -->
+        <div class="text-center space-y-3">
+            <div class="mx-auto w-12 h-12 bg-white/5 border border-white/10 rounded-full flex items-center justify-center mb-4 text-indigo-400">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
                 </svg>
-                <span>Fetching playlist metadata...</span>
             </div>
+            <h2 class="text-2xl font-semibold text-zinc-100 tracking-tight">Initialize Folder Synchronization</h2>
+            <p class="text-zinc-400 text-sm leading-relaxed max-w-sm mx-auto">
+                No active configuration found. Link a YouTube playlist to begin synchronizing with your local directory.
+            </p>
         </div>
-    </form>
+
+        {% if error_message %}
+        <div class="bg-rose-950/40 border border-rose-500/30 rounded-xl p-4 text-xs text-rose-300 flex items-start gap-2.5">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-rose-400 shrink-0 mt-0.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+            <span>{{ error_message }}</span>
+        </div>
+        {% endif %}
+
+        <!-- Target Directory Info -->
+        <div class="bg-black/40 border border-white/5 rounded-xl p-4 flex flex-col gap-2">
+            <span class="text-xs font-medium text-zinc-500 uppercase tracking-widest">Target Directory</span>
+            <code class="font-mono text-xs text-indigo-300 break-all">{{ target_dir }}</code>
+        </div>
+
+        <!-- Form -->
+        <form hx-post="/initialize" hx-target="#dashboard-content" hx-swap="innerHTML" hx-indicator="#init-spinner" class="flex flex-col gap-5">
+            
+            <div class="space-y-2">
+                <label for="playlist_url" class="block text-sm font-medium text-zinc-300">
+                    Playlist URL
+                </label>
+                <input type="url" id="playlist_url" name="playlist_url" required 
+                    placeholder="https://www.youtube.com/playlist?list=PL..." 
+                    class="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm">
+            </div>
+
+            <div class="flex items-center justify-between pt-2">
+                <button type="submit" class="group relative px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_25px_rgba(79,70,229,0.5)] flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                    </svg>
+                    Link Playlist
+                </button>
+
+                <!-- Spinner -->
+                <div id="init-spinner" class="htmx-indicator flex items-center gap-2.5 text-indigo-400 text-sm font-medium">
+                    <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                    </svg>
+                    <span>Fetching playlist metadata...</span>
+                </div>
+            </div>
+        </form>
+    </div>
 </div>
