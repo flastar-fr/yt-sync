@@ -119,8 +119,10 @@ class PlaylistExtractor:
 
         if self._config.cookies_browser:
             opts["cookiesfrombrowser"] = (self._config.cookies_browser,)
+            opts["extractor_args"] = {"youtube": {"player_client": ["web"]}}
         elif self._config.cookies_file:
             opts["cookiefile"] = self._config.cookies_file
+            opts["extractor_args"] = {"youtube": {"player_client": ["web"]}}
         else:
             opts["extractor_args"] = {"youtube": {"player_client": ["android", "web"]}}
 
@@ -245,8 +247,10 @@ class PlaylistExtractor:
 
         if eff_cookies_browser:
             opts["cookiesfrombrowser"] = (eff_cookies_browser,)
+            opts["extractor_args"] = {"youtube": {"player_client": ["web"]}}
         elif eff_cookies_file:
             opts["cookiefile"] = eff_cookies_file
+            opts["extractor_args"] = {"youtube": {"player_client": ["web"]}}
         else:
             opts["extractor_args"] = {"youtube": {"player_client": ["android", "web"]}}
 
