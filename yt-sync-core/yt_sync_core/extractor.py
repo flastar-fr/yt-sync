@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 import yt_dlp
 
@@ -69,6 +69,8 @@ class PlaylistExtractor:
         normalize_audio: bool = True,
         target_lufs: float = -14.0,
         true_peak: float = -1.5,
+        audio_format: Literal["m4a", "mp3"] = "m4a",
+        audio_quality: str = "192",
     ) -> None:
         if config is not None:
             self._config = config
@@ -77,6 +79,8 @@ class PlaylistExtractor:
                 normalize_audio=normalize_audio,
                 target_lufs=target_lufs,
                 true_peak=true_peak,
+                audio_format=audio_format,
+                audio_quality=audio_quality,
             )
 
     @property
@@ -147,6 +151,8 @@ class PlaylistExtractor:
         normalize_audio: bool | None = None,
         target_lufs: float | None = None,
         true_peak: float | None = None,
+        audio_format: Literal["m4a", "mp3"] | str | None = None,
+        audio_quality: str | None = None,
         config: SyncConfig | None = None,
     ) -> None:
         """Download specified videos by their IDs.
@@ -158,6 +164,8 @@ class PlaylistExtractor:
             normalize_audio: Optional override for audio loudness normalization.
             target_lufs: Optional override for target LUFS.
             true_peak: Optional override for true peak level in dBTP.
+            audio_format: Optional override for target audio format ("m4a" or "mp3").
+            audio_quality: Optional override for audio quality (e.g. "192").
             config: Optional SyncConfig instance overriding default settings.
         """
         if not video_ids:
@@ -175,6 +183,12 @@ class PlaylistExtractor:
         eff_true_peak = (
             true_peak if true_peak is not None else effective_cfg.true_peak
         )
+        eff_audio_format = (
+            audio_format if audio_format is not None else effective_cfg.audio_format
+        )
+        eff_audio_quality = (
+            audio_quality if audio_quality is not None else effective_cfg.audio_quality
+        )
 
         hooks: list[Callable[[dict[str, Any]], None]] = []
         if progress_callback is not None:
@@ -184,9 +198,16 @@ class PlaylistExtractor:
             "quiet": True,
             "no_warnings": True,
             "ignoreerrors": True,
-            "outtmpl": f"{output_dir}/%(title)s [%(id)s].%(ext)s",
+            "outtmpl": f"{output_dir}/%(title)s.%(ext)s",
             "format": "bestaudio/best",
             "progress_hooks": hooks,
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": eff_audio_format,
+                    "preferredquality": eff_audio_quality,
+                }
+            ],
         }
 
         if eff_normalize:

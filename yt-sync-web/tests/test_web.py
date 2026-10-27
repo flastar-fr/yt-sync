@@ -46,6 +46,7 @@ class TestWebDashboard:
         assert "htmx.org@2." in response.text
         assert "Initialize Folder Synchronization" in response.text
         assert "Audio Normalization (EBU R128)" in response.text
+        assert 'name="audio_format"' in response.text
         assert 'hx-post="/initialize"' in response.text
 
     @patch("yt_sync_web.__main__.PlaylistExtractor")
@@ -227,10 +228,48 @@ class TestWebDashboard:
 
         # Assert
         assert response.status_code == 200
-        mock_extractor_class.assert_called_with(normalize_audio=False)
+        mock_extractor_class.assert_called_with(normalize_audio=False, audio_format="m4a")
         loaded = manager.load()
         assert loaded.config.normalize_audio is False
         assert "Audio Normalization (EBU R128)" in response.text
+
+    @patch("yt_sync_web.__main__.PlaylistExtractor")
+    def test_post_sync_with_audio_format_mp3(
+        self, mock_extractor_class: MagicMock, client: TestClient, tmp_path: Path
+    ) -> None:
+        # Arrange
+        sync_folder = tmp_path / "sync_music_mp3"
+        sync_folder.mkdir()
+        app.state.target_dir = sync_folder
+
+        manager = StateManager(target_dir=sync_folder)
+        manager.save(
+            SyncState(
+                playlist_url="https://youtube.com/playlist?list=PL_TEST",
+                playlist_name="My Playlist",
+                tracks={},
+                config=SyncConfig(audio_format="m4a"),
+            )
+        )
+
+        mock_extractor = mock_extractor_class.return_value
+        mock_extractor.fetch_playlist_details.return_value = (
+            "My Playlist",
+            [RemoteTrack(video_id="new1", title="Track One", is_available=True)],
+        )
+
+        # Act
+        response = client.post(
+            "/sync",
+            data={"audio_format": "mp3", "sync_form": "1", "normalize_audio": "true"},
+        )
+
+        # Assert
+        assert response.status_code == 200
+        mock_extractor_class.assert_called_with(normalize_audio=True, audio_format="mp3")
+        loaded = manager.load()
+        assert loaded.config.audio_format == "mp3"
+        assert "mp3" in response.text.lower()
 
     def test_post_ignore_track_marks_status_as_skipped(
         self, client: TestClient, tmp_path: Path

@@ -343,3 +343,52 @@ class TestPlaylistExtractorDownloadTracks:
         # Assert
         call_kwargs = MockYDL.call_args[0][0]
         assert "postprocessor_args" not in call_kwargs
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_outtmpl_uses_title_without_id(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.download_tracks(["vid001"], output_dir="/tmp/music")
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert call_kwargs["outtmpl"] == "/tmp/music/%(title)s.%(ext)s"
+        assert "[%(id)s]" not in call_kwargs["outtmpl"]
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_configures_ffmpeg_extract_audio_postprocessor_m4a_default(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.download_tracks(["vid001"], output_dir="/tmp/music")
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert "postprocessors" in call_kwargs
+        postprocessors = call_kwargs["postprocessors"]
+        assert postprocessors[0]["key"] == "FFmpegExtractAudio"
+        assert postprocessors[0]["preferredcodec"] == "m4a"
+        assert postprocessors[0]["preferredquality"] == "192"
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_with_mp3_format_transmits_preferredcodec_mp3(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.download_tracks(["vid001"], output_dir="/tmp/music", audio_format="mp3")
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert "postprocessors" in call_kwargs
+        postprocessors = call_kwargs["postprocessors"]
+        assert postprocessors[0]["preferredcodec"] == "mp3"

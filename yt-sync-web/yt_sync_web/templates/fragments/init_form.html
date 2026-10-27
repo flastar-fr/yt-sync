@@ -44,11 +44,21 @@
                     class="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm">
             </div>
 
-            <input type="hidden" name="init_form" value="1">
-            <label class="flex items-center gap-2.5 text-xs text-zinc-300 cursor-pointer select-none bg-black/40 border border-white/5 px-3 py-2.5 rounded-xl hover:border-white/10 transition-colors w-fit">
-                <input type="checkbox" name="normalize_audio" value="true" checked class="rounded bg-zinc-800 border-white/10 text-indigo-600 focus:ring-indigo-500/50 h-4 w-4">
-                <span>Audio Normalization (EBU R128)</span>
-            </label>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <input type="hidden" name="init_form" value="1">
+                <label class="flex items-center gap-2.5 text-xs text-zinc-300 cursor-pointer select-none bg-black/40 border border-white/5 px-3 py-2.5 rounded-xl hover:border-white/10 transition-colors">
+                    <input type="checkbox" name="normalize_audio" value="true" checked class="rounded bg-zinc-800 border-white/10 text-indigo-600 focus:ring-indigo-500/50 h-4 w-4">
+                    <span>Audio Normalization (EBU R128)</span>
+                </label>
+
+                <div class="flex items-center gap-2 bg-black/40 border border-white/5 px-3 py-2 rounded-xl">
+                    <span class="text-xs text-zinc-400 font-medium">Format:</span>
+                    <select name="audio_format" class="bg-zinc-800 border border-white/10 text-zinc-200 text-xs rounded-lg px-2.5 py-1 focus:ring-1 focus:ring-indigo-500 focus:outline-none cursor-pointer">
+                        <option value="m4a" selected>M4A (AAC)</option>
+                        <option value="mp3">MP3</option>
+                    </select>
+                </div>
+            </div>
 
             <div class="flex items-center justify-between pt-2">
                 <button type="submit" class="group relative px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_25px_rgba(79,70,229,0.5)] flex items-center gap-2">

@@ -42,6 +42,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable EBU R128 audio loudness normalization.",
     )
+    parser.add_argument(
+        "--format",
+        choices=["m4a", "mp3"],
+        default="m4a",
+        help="Target audio format (default: m4a, choices: m4a, mp3).",
+    )
     return parser
 
 
@@ -99,11 +105,15 @@ def run_sync(
     *,
     dry_run: bool = False,
     normalize_audio: bool = True,
+    audio_format: str = "m4a",
     extractor: PlaylistExtractor | None = None,
 ) -> int:
     """Execute the end-to-end synchronization workflow."""
     if extractor is None:
-        extractor = PlaylistExtractor(normalize_audio=normalize_audio)
+        extractor = PlaylistExtractor(
+            normalize_audio=normalize_audio,
+            audio_format=audio_format,
+        )
 
     # 1. Target directory validation and preparation
     target_dir = target_dir.resolve()
@@ -161,6 +171,7 @@ def run_sync(
                 output_dir=str(target_dir),
                 progress_callback=progress_hook,
                 normalize_audio=normalize_audio,
+                audio_format=audio_format,
             )
             # Mark successfully downloaded tracks
             for new_t in diff.new_tracks:
@@ -194,7 +205,10 @@ def run_sync(
         playlist_name=current_state.playlist_name,
         last_synced_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         tracks=updated_tracks,
-        config=SyncConfig(normalize_audio=normalize_audio),
+        config=SyncConfig(
+            normalize_audio=normalize_audio,
+            audio_format=audio_format,
+        ),
     )
     try:
         state_manager.save(new_state)
@@ -215,6 +229,7 @@ def main(argv: list[str] | None = None) -> None:
         playlist_url=args.playlist_url,
         dry_run=args.dry_run,
         normalize_audio=not args.no_normalize,
+        audio_format=args.format,
     )
     if exit_code != 0:
         sys.exit(exit_code)

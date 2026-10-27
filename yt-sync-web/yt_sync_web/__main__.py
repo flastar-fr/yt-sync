@@ -153,6 +153,8 @@ def _build_dashboard_context(
         "normalize_audio": state.config.normalize_audio,
         "target_lufs": state.config.target_lufs,
         "true_peak": state.config.true_peak,
+        "audio_format": state.config.audio_format,
+        "audio_quality": state.config.audio_quality,
     }
 
 
@@ -224,6 +226,7 @@ async def post_initialize(
     request: Request,
     playlist_url: str = Form(...),
     normalize_audio: str | None = Form(default=None),
+    audio_format: str | None = Form(default=None),
     init_form: str | None = Form(default=None),
 ) -> HTMLResponse:
     """Initialize state for target directory by querying remote playlist metadata."""
@@ -241,7 +244,12 @@ async def post_initialize(
     else:
         should_normalize = True
 
-    extractor = PlaylistExtractor(normalize_audio=should_normalize)
+    should_format = audio_format if audio_format in ("m4a", "mp3") else "m4a"
+
+    extractor = PlaylistExtractor(
+        normalize_audio=should_normalize,
+        audio_format=should_format,
+    )
     try:
         # Offload yt-dlp metadata extraction to thread pool
         title, remote_tracks = await asyncio.to_thread(
@@ -280,7 +288,10 @@ async def post_initialize(
         playlist_name=title,
         last_synced_at=None,
         tracks=initial_tracks,
-        config=SyncConfig(normalize_audio=should_normalize),
+        config=SyncConfig(
+            normalize_audio=should_normalize,
+            audio_format=should_format,
+        ),
     )
 
     try:
@@ -366,6 +377,7 @@ async def post_refresh(request: Request) -> HTMLResponse:
 async def post_sync(
     request: Request,
     normalize_audio: str | None = Form(default=None),
+    audio_format: str | None = Form(default=None),
     sync_form: str | None = Form(default=None),
 ) -> HTMLResponse:
     """Download missing tracks in background thread pool and update local state."""
@@ -398,7 +410,15 @@ async def post_sync(
     else:
         should_normalize = current_state.config.normalize_audio
 
-    extractor = PlaylistExtractor(normalize_audio=should_normalize)
+    if audio_format is not None and audio_format in ("m4a", "mp3"):
+        should_format = audio_format
+    else:
+        should_format = current_state.config.audio_format
+
+    extractor = PlaylistExtractor(
+        normalize_audio=should_normalize,
+        audio_format=should_format,
+    )
     diff_engine = DiffEngine()
 
     try:
@@ -457,6 +477,8 @@ async def post_sync(
             normalize_audio=should_normalize,
             target_lufs=current_state.config.target_lufs,
             true_peak=current_state.config.true_peak,
+            audio_format=should_format,
+            audio_quality=current_state.config.audio_quality,
         ),
     )
 

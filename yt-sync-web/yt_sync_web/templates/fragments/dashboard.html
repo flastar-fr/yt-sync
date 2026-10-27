@@ -56,6 +56,12 @@
                     </span>
                     {% endif %}
                 </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-zinc-500 w-24">Format:</span>
+                    <span class="text-zinc-300 font-mono text-xs uppercase px-2 py-0.5 rounded bg-white/5 border border-white/10 font-medium">
+                        {{ audio_format or "m4a" }} ({{ audio_quality or "192" }}k)
+                    </span>
+                </div>
             </div>
         </div>
 
@@ -71,6 +77,13 @@
             {% if new_count > 0 %}
             <form hx-post="/sync" hx-target="#dashboard-content" hx-swap="innerHTML" hx-indicator="#sync-spinner" class="flex flex-wrap items-center gap-3">
                 <input type="hidden" name="sync_form" value="1">
+                <div class="flex items-center gap-1.5 bg-black/40 border border-white/5 px-3 py-2 rounded-xl">
+                    <span class="text-xs text-zinc-400 font-medium">Format:</span>
+                    <select name="audio_format" class="bg-zinc-800 border border-white/10 text-zinc-200 text-xs rounded-lg px-2 py-1 focus:ring-1 focus:ring-indigo-500 focus:outline-none cursor-pointer">
+                        <option value="m4a" {% if audio_format == 'm4a' or not audio_format %}selected{% endif %}>M4A (AAC)</option>
+                        <option value="mp3" {% if audio_format == 'mp3' %}selected{% endif %}>MP3</option>
+                    </select>
+                </div>
                 <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer select-none bg-black/40 border border-white/5 px-3 py-2 rounded-xl hover:border-white/10 transition-colors">
                     <input type="checkbox" name="normalize_audio" value="true" {% if normalize_audio %}checked{% endif %} class="rounded bg-zinc-800 border-white/10 text-indigo-600 focus:ring-indigo-500/50 h-4 w-4">
                     <span>Audio Normalization (EBU R128)</span>
@@ -83,6 +96,10 @@
                 </button>
             </form>
             {% else %}
+            <div class="flex items-center gap-1.5 bg-black/20 border border-white/5 px-3 py-2 rounded-xl opacity-60">
+                <span class="text-xs text-zinc-500 font-medium">Format:</span>
+                <span class="text-zinc-400 font-mono text-xs uppercase">{{ audio_format or "m4a" }}</span>
+            </div>
             <label class="flex items-center gap-2 text-xs text-zinc-500 select-none bg-black/20 border border-white/5 px-3 py-2 rounded-xl opacity-60">
                 <input type="checkbox" disabled {% if normalize_audio %}checked{% endif %} class="rounded bg-zinc-800 border-white/10 text-zinc-600 h-4 w-4">
                 <span>Audio Normalization (EBU R128)</span>

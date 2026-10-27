@@ -206,22 +206,35 @@ class TestSyncConfig:
         assert config.normalize_audio is True
         assert config.target_lufs == -14.0
         assert config.true_peak == -1.5
+        assert config.audio_format == "m4a"
+        assert config.audio_quality == "192"
 
     def test_custom_sync_config_values(self) -> None:
         # Arrange
         normalize_audio = False
         target_lufs = -16.0
         true_peak = -2.0
+        audio_format = "mp3"
+        audio_quality = "320"
         # Act
         config = SyncConfig(
             normalize_audio=normalize_audio,
             target_lufs=target_lufs,
             true_peak=true_peak,
+            audio_format=audio_format,
+            audio_quality=audio_quality,
         )
         # Assert
         assert config.normalize_audio is False
         assert config.target_lufs == -16.0
         assert config.true_peak == -2.0
+        assert config.audio_format == "mp3"
+        assert config.audio_quality == "320"
+
+    def test_sync_config_invalid_audio_format_raises(self) -> None:
+        # Arrange / Act / Assert
+        with pytest.raises(ValidationError):
+            SyncConfig(audio_format="wav")  # type: ignore[arg-type]
 
     def test_sync_state_default_config_has_normalization_enabled(self) -> None:
         # Arrange / Act
@@ -230,9 +243,13 @@ class TestSyncConfig:
         assert state.config.normalize_audio is True
         assert state.config.target_lufs == -14.0
         assert state.config.true_peak == -1.5
+        assert state.config.audio_format == "m4a"
+        assert state.config.audio_quality == "192"
         assert state.normalize_audio is True
         assert state.target_lufs == -14.0
         assert state.true_peak == -1.5
+        assert state.audio_format == "m4a"
+        assert state.audio_quality == "192"
 
     def test_sync_state_with_custom_config(self) -> None:
         # Arrange

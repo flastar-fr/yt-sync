@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -42,11 +42,15 @@ class SyncConfig(BaseModel):
         normalize_audio: Whether to normalize loudness via EBU R128 loudnorm filter.
         target_lufs: Target integrated loudness in LUFS (standard: -14.0 for streaming/web).
         true_peak: Maximum true peak level in dBTP (standard: -1.5 dBTP).
+        audio_format: Target audio codec format ("m4a" or "mp3", default: "m4a").
+        audio_quality: Target audio bitrate/quality string (default: "192").
     """
 
     normalize_audio: bool = True
     target_lufs: float = -14.0
     true_peak: float = -1.5
+    audio_format: Literal["m4a", "mp3"] = "m4a"
+    audio_quality: str = "192"
 
     model_config = {"frozen": True}
 
@@ -74,7 +78,13 @@ class SyncState(BaseModel):
     @classmethod
     def _migrate_flat_config(cls, data: Any) -> Any:
         if isinstance(data, dict):
-            flat_keys = ("normalize_audio", "target_lufs", "true_peak")
+            flat_keys = (
+                "normalize_audio",
+                "target_lufs",
+                "true_peak",
+                "audio_format",
+                "audio_quality",
+            )
             if any(k in data for k in flat_keys):
                 existing_config = data.get("config")
                 cfg_dict: dict[str, Any] = (
@@ -106,3 +116,13 @@ class SyncState(BaseModel):
     def true_peak(self) -> float:
         """Convenience property delegating to config.true_peak."""
         return self.config.true_peak
+
+    @property
+    def audio_format(self) -> str:
+        """Convenience property delegating to config.audio_format."""
+        return self.config.audio_format
+
+    @property
+    def audio_quality(self) -> str:
+        """Convenience property delegating to config.audio_quality."""
+        return self.config.audio_quality
