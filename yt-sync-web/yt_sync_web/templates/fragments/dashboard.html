@@ -180,8 +180,8 @@
     </div>
 
     <!-- Spinners Container -->
-    <div class="w-full space-y-2">
-        <div id="loading-spinner" class="htmx-indicator flex items-center gap-3 text-indigo-400 text-sm font-medium bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3 mt-4">
+    <div class="w-full">
+        <div id="loading-spinner" class="htmx-indicator items-center gap-3 text-indigo-400 text-sm font-medium bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3 mt-3">
             <svg class="animate-spin h-4 w-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
@@ -189,7 +189,7 @@
             <span>Checking YouTube playlist differential... (Anti-quota burn enabled)</span>
         </div>
         
-        <div id="sync-spinner" class="htmx-indicator flex items-center gap-3 text-emerald-400 text-sm font-medium bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 mt-4">
+        <div id="sync-spinner" class="htmx-indicator items-center gap-3 text-emerald-400 text-sm font-medium bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 mt-3">
             <svg class="animate-spin h-4 w-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
@@ -199,7 +199,7 @@
     </div>
 
     <!-- Status Overview Counters -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
         <div class="bg-black/40 border border-white/5 p-4 rounded-xl flex flex-col items-center justify-center">
             <div class="text-3xl font-bold text-zinc-100">{{ total_count }}</div>
             <div class="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mt-1">Total Tracks</div>
@@ -292,7 +292,7 @@
             <!-- Controls & Status Badge -->
             <div class="shrink-0 flex items-center gap-2">
                 <!-- Surgical Trim Editor Popover -->
-                <details class="relative">
+                <details class="relative trim-details" name="track-trim" ontoggle="if(this.open){document.querySelectorAll('details.trim-details[open]').forEach(function(d){if(d!==this)d.removeAttribute('open')},this)}">
                     <summary class="list-none cursor-pointer px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 hover:text-white text-xs font-medium transition flex items-center gap-1.5 select-none" title="Set Start/End trim for this track">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 text-zinc-400">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M7.848 8.25l1.536.887m8.416 4.863l-1.536-.887M6.75 12a.75.75 0 10-1.5 0 .75.75 0 001.5 0zm0 0v-3.75a3.75 3.75 0 017.5 0v1.5m-7.5 2.25h14.25" />
@@ -316,6 +316,9 @@
                                 </div>
                             </div>
                             <div class="flex items-center justify-end gap-2 pt-1">
+                                <button type="button" onclick="this.closest('details').removeAttribute('open')" class="px-2.5 py-1 text-xs text-zinc-400 hover:text-zinc-200 transition">
+                                    Cancel
+                                </button>
                                 <button type="submit" class="px-3 py-1 text-xs font-medium rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition">
                                     Save Trim
                                 </button>

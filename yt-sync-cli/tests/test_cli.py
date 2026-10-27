@@ -449,3 +449,30 @@ class TestCLIRunSync:
         assert call_kwargs["cookies_browser"] == "brave"
         reloaded = manager.load()
         assert reloaded.config.cookies_browser == "brave"
+
+    def test_run_sync_when_download_fails_marks_track_as_error(
+        self, tmp_path: Path
+    ) -> None:
+        # Arrange
+        target_dir = tmp_path / "downloads_dl_fail"
+        mock_extractor = MagicMock()
+        mock_extractor.fetch_playlist.return_value = [
+            RemoteTrack(video_id="err1", title="Error Track", is_available=True)
+        ]
+        mock_extractor.download_tracks.side_effect = ExtractionError("Download crashed")
+
+        # Act
+        exit_code = run_sync(
+            target_dir=target_dir,
+            playlist_url="https://youtube.com/playlist?list=xyz",
+            extractor=mock_extractor,
+        )
+
+        # Assert
+        assert exit_code == 0
+        manager = StateManager(target_dir=target_dir)
+        state = manager.load()
+        assert "err1" in state.tracks
+        assert state.tracks["err1"].status == TrackStatus.ERROR
+        assert state.tracks["err1"].status != TrackStatus.DOWNLOADED
+        assert "Download crashed" in (state.tracks["err1"].error_message or "")

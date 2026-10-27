@@ -240,7 +240,6 @@ class PlaylistExtractor:
         opts: dict[str, Any] = {
             "quiet": True,
             "no_warnings": True,
-            "ignoreerrors": True,
             "outtmpl": f"{output_dir}/%(title)s.%(ext)s",
             "format": "bestaudio/best",
             "progress_hooks": hooks,
@@ -305,7 +304,14 @@ class PlaylistExtractor:
 
             urls = [f"https://www.youtube.com/watch?v={vid}" for vid in video_ids]
             with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.download(urls)
+                try:
+                    ret = ydl.download(urls)
+                except Exception as exc:
+                    raise ExtractionError(f"yt-dlp download failed: {exc}") from exc
+                if ret != 0:
+                    raise ExtractionError(
+                        f"yt-dlp failed downloading tracks with return code {ret}"
+                    )
         else:
             for vid in video_ids:
                 track_opts = dict(opts)
@@ -331,4 +337,13 @@ class PlaylistExtractor:
                     del track_opts["postprocessor_args"]
 
                 with yt_dlp.YoutubeDL(track_opts) as ydl:
-                    ydl.download([f"https://www.youtube.com/watch?v={vid}"])
+                    try:
+                        ret = ydl.download([f"https://www.youtube.com/watch?v={vid}"])
+                    except Exception as exc:
+                        raise ExtractionError(
+                            f"yt-dlp download failed for video {vid}: {exc}"
+                        ) from exc
+                    if ret != 0:
+                        raise ExtractionError(
+                            f"yt-dlp failed downloading video {vid} with return code {ret}"
+                        )

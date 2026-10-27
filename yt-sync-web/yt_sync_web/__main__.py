@@ -558,16 +558,15 @@ async def post_sync(
                 )
         except Exception as exc:
             for new_t in diff.new_tracks:
-                if new_t.video_id not in updated_tracks:
-                    existing_t = current_state.tracks.get(new_t.video_id)
-                    updated_tracks[new_t.video_id] = TrackSnapshot(
-                        video_id=new_t.video_id,
-                        title=new_t.title,
-                        status=TrackStatus.ERROR,
-                        error_message=str(exc),
-                        trim_start=existing_t.trim_start if existing_t else None,
-                        trim_end=existing_t.trim_end if existing_t else None,
-                    )
+                existing_t = current_state.tracks.get(new_t.video_id)
+                updated_tracks[new_t.video_id] = TrackSnapshot(
+                    video_id=new_t.video_id,
+                    title=new_t.title,
+                    status=TrackStatus.ERROR,
+                    error_message=str(exc),
+                    trim_start=existing_t.trim_start if existing_t else None,
+                    trim_end=existing_t.trim_end if existing_t else None,
+                )
 
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     new_state = SyncState(

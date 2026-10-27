@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from yt_sync_core import __version__ as core_version
+from yt_sync_core.exceptions import ExtractionError
 from yt_sync_core.extractor import RemoteTrack
 from yt_sync_core.models import SyncConfig, SyncState, TrackSnapshot, TrackStatus
 from yt_sync_core.storage import STATE_FILENAME, StateManager
@@ -506,3 +507,39 @@ class TestWebDashboard:
         assert call_kwargs["cookies_browser"] == "chrome"
         loaded = manager.load()
         assert loaded.config.cookies_browser == "chrome"
+
+    @patch("yt_sync_web.__main__.PlaylistExtractor")
+    def test_post_sync_when_download_tracks_fails_marks_tracks_as_error(
+        self, mock_extractor_class: MagicMock, client: TestClient, tmp_path: Path
+    ) -> None:
+        # Arrange
+        sync_folder = tmp_path / "sync_fail"
+        sync_folder.mkdir()
+        app.state.target_dir = sync_folder
+
+        manager = StateManager(target_dir=sync_folder)
+        manager.save(
+            SyncState(
+                playlist_url="https://youtube.com/playlist?list=FAIL",
+                playlist_name="Fail Playlist",
+                tracks={},
+            )
+        )
+
+        mock_extractor = mock_extractor_class.return_value
+        mock_extractor.fetch_playlist_details.return_value = (
+            "Fail Playlist",
+            [RemoteTrack(video_id="f1", title="Failing Track", is_available=True)],
+        )
+        mock_extractor.download_tracks.side_effect = ExtractionError("Network error: 403 Forbidden")
+
+        # Act
+        response = client.post("/sync")
+
+        # Assert
+        assert response.status_code == 200
+        loaded = manager.load()
+        assert "f1" in loaded.tracks
+        assert loaded.tracks["f1"].status == TrackStatus.ERROR
+        assert loaded.tracks["f1"].status != TrackStatus.DOWNLOADED
+        assert "Network error" in (loaded.tracks["f1"].error_message or "")

@@ -34,13 +34,13 @@
         /* HTMX Indicator display and transitions */
         .htmx-indicator { 
             opacity: 0; 
-            display: none;
+            display: none !important;
             transition: opacity 200ms ease-in; 
         }
         .htmx-request.htmx-indicator,
         .htmx-request .htmx-indicator { 
             opacity: 1; 
-            display: flex;
+            display: flex !important;
         }
         
         /* Custom scrollbar for webkit */
@@ -94,5 +94,16 @@
             {% endif %}
         </main>
     </div>
+
+    <!-- Trim popover mutual exclusion and outside-click closer -->
+    <script>
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('details.trim-details')) {
+                document.querySelectorAll('details.trim-details[open]').forEach(function(d) {
+                    d.removeAttribute('open');
+                });
+            }
+        });
+    </script>
 </body>
 </html>

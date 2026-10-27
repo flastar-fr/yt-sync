@@ -55,6 +55,7 @@ def _make_ydl_mock(info: dict[str, Any] | None = None) -> MagicMock:
     mock_ydl.__enter__ = MagicMock(return_value=mock_ydl)
     mock_ydl.__exit__ = MagicMock(return_value=False)
     mock_ydl.extract_info.return_value = info
+    mock_ydl.download.return_value = 0
     return mock_ydl
 
 
@@ -684,6 +685,34 @@ class TestPlaylistExtractorDownloadTracks:
         assert call_kwargs.get("extractor_args") == {
             "youtube": {"player_client": ["web"]}
         }
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_raises_extraction_error_on_nonzero_exit_code(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        mock_ydl.download.return_value = 1
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+
+        # Act & Assert
+        with pytest.raises(ExtractionError, match="yt-dlp failed downloading tracks with return code 1"):
+            extractor.download_tracks(["vid001"], output_dir="/tmp/music")
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_raises_extraction_error_on_download_exception(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        mock_ydl.download.side_effect = Exception("Network connection lost")
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+
+        # Act & Assert
+        with pytest.raises(ExtractionError, match="Network connection lost"):
+            extractor.download_tracks(["vid001"], output_dir="/tmp/music")
 
     @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
     def test_download_tracks_with_call_level_cookies_override(
