@@ -47,6 +47,8 @@ class SyncConfig(BaseModel):
         audio_format: Target audio codec format ("m4a" or "mp3", default: "m4a").
         audio_quality: Target audio bitrate/quality string (default: "192").
         enable_sponsorblock: Whether to automatically cut non-music segments via SponsorBlock.
+        cookies_browser: Optional browser name to extract authentication cookies from (e.g. "firefox", "chrome").
+        cookies_file: Optional path to a Netscape-format cookies.txt file.
     """
 
     normalize_audio: bool = True
@@ -55,6 +57,8 @@ class SyncConfig(BaseModel):
     audio_format: Literal["m4a", "mp3"] = "m4a"
     audio_quality: str = "192"
     enable_sponsorblock: bool = True
+    cookies_browser: str | None = None
+    cookies_file: str | None = None
 
     model_config = {"frozen": True}
 
@@ -89,6 +93,8 @@ class SyncState(BaseModel):
                 "audio_format",
                 "audio_quality",
                 "enable_sponsorblock",
+                "cookies_browser",
+                "cookies_file",
             )
             if any(k in data for k in flat_keys):
                 existing_config = data.get("config")
@@ -136,3 +142,13 @@ class SyncState(BaseModel):
     def enable_sponsorblock(self) -> bool:
         """Convenience property delegating to config.enable_sponsorblock."""
         return self.config.enable_sponsorblock
+
+    @property
+    def cookies_browser(self) -> str | None:
+        """Convenience property delegating to config.cookies_browser."""
+        return self.config.cookies_browser
+
+    @property
+    def cookies_file(self) -> str | None:
+        """Convenience property delegating to config.cookies_file."""
+        return self.config.cookies_file

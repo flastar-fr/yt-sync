@@ -201,6 +201,53 @@ class TestPlaylistExtractorFetchPlaylist:
         # Assert
         mock_ydl.extract_info.assert_called_once_with(PLAYLIST_URL, download=False)
 
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_fetch_playlist_includes_player_client_extractor_args(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock(_FAKE_PLAYLIST_INFO)
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.fetch_playlist(PLAYLIST_URL)
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert "extractor_args" in call_kwargs
+        assert call_kwargs["extractor_args"]["youtube"]["player_client"] == ["android", "web"]
+        assert "cookiesfrombrowser" not in call_kwargs
+        assert "cookiefile" not in call_kwargs
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_fetch_playlist_with_cookies_browser(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock(_FAKE_PLAYLIST_INFO)
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor(cookies_browser="firefox")
+        # Act
+        extractor.fetch_playlist(PLAYLIST_URL)
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert call_kwargs["cookiesfrombrowser"] == ("firefox",)
+        assert "cookiefile" not in call_kwargs
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_fetch_playlist_with_cookies_file(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock(_FAKE_PLAYLIST_INFO)
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor(cookies_file="/path/to/cookies.txt")
+        # Act
+        extractor.fetch_playlist(PLAYLIST_URL)
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert call_kwargs["cookiefile"] == "/path/to/cookies.txt"
+        assert "cookiesfrombrowser" not in call_kwargs
+
 
 # ---------------------------------------------------------------------------
 # PlaylistExtractor — download_tracks
@@ -507,3 +554,66 @@ class TestPlaylistExtractorDownloadTracks:
         assert "00:05" in args
         assert "-to" in args
         assert "02:30" in args
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_includes_player_client_extractor_args(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.download_tracks(["vid001"], output_dir="/tmp/music")
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert "extractor_args" in call_kwargs
+        assert call_kwargs["extractor_args"]["youtube"]["player_client"] == ["android", "web"]
+        assert "cookiesfrombrowser" not in call_kwargs
+        assert "cookiefile" not in call_kwargs
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_with_cookies_browser_transmits_cookiesfrombrowser(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor(cookies_browser="firefox")
+        # Act
+        extractor.download_tracks(["vid001"], output_dir="/tmp/music")
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert call_kwargs.get("cookiesfrombrowser") == ("firefox",)
+        assert "cookiefile" not in call_kwargs
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_with_cookies_file_transmits_cookiefile(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor(cookies_file="/path/to/cookies.txt")
+        # Act
+        extractor.download_tracks(["vid001"], output_dir="/tmp/music")
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert call_kwargs.get("cookiefile") == "/path/to/cookies.txt"
+        assert "cookiesfrombrowser" not in call_kwargs
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_with_call_level_cookies_override(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.download_tracks(
+            ["vid001"], output_dir="/tmp/music", cookies_browser="chrome"
+        )
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert call_kwargs.get("cookiesfrombrowser") == ("chrome",)

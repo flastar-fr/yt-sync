@@ -231,6 +231,8 @@ class TestSyncConfig:
         assert config.audio_format == "m4a"
         assert config.audio_quality == "192"
         assert config.enable_sponsorblock is True
+        assert config.cookies_browser is None
+        assert config.cookies_file is None
 
     def test_custom_sync_config_values(self) -> None:
         # Arrange
@@ -240,6 +242,8 @@ class TestSyncConfig:
         audio_format = "mp3"
         audio_quality = "320"
         enable_sponsorblock = False
+        cookies_browser = "firefox"
+        cookies_file = "/path/to/cookies.txt"
         # Act
         config = SyncConfig(
             normalize_audio=normalize_audio,
@@ -248,6 +252,8 @@ class TestSyncConfig:
             audio_format=audio_format,
             audio_quality=audio_quality,
             enable_sponsorblock=enable_sponsorblock,
+            cookies_browser=cookies_browser,
+            cookies_file=cookies_file,
         )
         # Assert
         assert config.normalize_audio is False
@@ -256,6 +262,8 @@ class TestSyncConfig:
         assert config.audio_format == "mp3"
         assert config.audio_quality == "320"
         assert config.enable_sponsorblock is False
+        assert config.cookies_browser == "firefox"
+        assert config.cookies_file == "/path/to/cookies.txt"
 
     def test_sync_config_invalid_audio_format_raises(self) -> None:
         # Arrange / Act / Assert
@@ -333,3 +341,44 @@ class TestSyncConfig:
         assert restored == original
         assert restored.tracks["vid_trim"].trim_start == "00:12"
         assert restored.tracks["vid_trim"].trim_end == "03:45"
+
+    def test_sync_state_delegates_cookies_properties(self) -> None:
+        # Arrange
+        custom_cfg = SyncConfig(
+            cookies_browser="brave",
+            cookies_file="/path/to/cookies.txt",
+        )
+        # Act
+        state = SyncState(config=custom_cfg)
+        # Assert
+        assert state.cookies_browser == "brave"
+        assert state.cookies_file == "/path/to/cookies.txt"
+
+    def test_sync_state_round_trip_preserves_cookies(self) -> None:
+        # Arrange
+        original = SyncState(
+            config=SyncConfig(
+                cookies_browser="firefox",
+                cookies_file="./my_cookies.txt",
+            )
+        )
+        # Act
+        json_str = original.model_dump_json()
+        restored = SyncState.model_validate_json(json_str)
+        # Assert
+        assert restored == original
+        assert restored.cookies_browser == "firefox"
+        assert restored.cookies_file == "./my_cookies.txt"
+
+    def test_sync_state_flat_config_migration_with_cookies(self) -> None:
+        # Arrange
+        raw_dict = {
+            "playlist_url": "https://youtube.com/playlist?list=123",
+            "cookies_browser": "chrome",
+            "cookies_file": "/tmp/cookies.txt",
+        }
+        # Act
+        state = SyncState.model_validate(raw_dict)
+        # Assert
+        assert state.config.cookies_browser == "chrome"
+        assert state.config.cookies_file == "/tmp/cookies.txt"

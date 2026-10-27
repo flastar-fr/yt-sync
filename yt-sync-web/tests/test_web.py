@@ -48,6 +48,7 @@ class TestWebDashboard:
         assert "Audio Normalization (EBU R128)" in response.text
         assert "Auto-cut video intros (SponsorBlock)" in response.text
         assert 'name="audio_format"' in response.text
+        assert 'name="cookies_browser"' in response.text
         assert 'hx-post="/initialize"' in response.text
 
     @patch("yt_sync_web.__main__.PlaylistExtractor")
@@ -198,6 +199,8 @@ class TestWebDashboard:
             ["new1"],
             output_dir=str(sync_folder),
             enable_sponsorblock=True,
+            cookies_browser=None,
+            cookies_file=None,
             track_trims={},
         )
         loaded = manager.load()
@@ -406,3 +409,100 @@ class TestWebDashboard:
         assert loaded.tracks["t1"].trim_start == "00:10"
         assert loaded.tracks["t1"].trim_end == "02:50"
         assert loaded.config.enable_sponsorblock is True
+
+    @patch("yt_sync_web.__main__.PlaylistExtractor")
+    def test_post_initialize_with_cookies_persists_config(
+        self, mock_extractor_class: MagicMock, client: TestClient, tmp_path: Path
+    ) -> None:
+        # Arrange
+        init_folder = tmp_path / "init_cookies"
+        init_folder.mkdir()
+        app.state.target_dir = init_folder
+
+        mock_extractor = mock_extractor_class.return_value
+        mock_extractor.fetch_playlist_details.return_value = (
+            "Cookie Playlist",
+            [RemoteTrack(video_id="ck1", title="Protected Song", is_available=True)],
+        )
+
+        # Act
+        response = client.post(
+            "/initialize",
+            data={
+                "playlist_url": "https://youtube.com/playlist?list=COOKIES",
+                "cookies_browser": "firefox",
+                "cookies_file": "/path/to/cookies.txt",
+                "init_form": "1",
+            },
+        )
+
+        # Assert
+        assert response.status_code == 200
+        loaded = StateManager(target_dir=init_folder).load()
+        assert loaded.config.cookies_browser == "firefox"
+        assert loaded.config.cookies_file == "/path/to/cookies.txt"
+
+    def test_post_settings_cookies_updates_state_and_returns_dashboard(
+        self, client: TestClient, tmp_path: Path
+    ) -> None:
+        # Arrange
+        settings_folder = tmp_path / "settings_cookies"
+        settings_folder.mkdir()
+        app.state.target_dir = settings_folder
+
+        manager = StateManager(target_dir=settings_folder)
+        manager.save(
+            SyncState(
+                playlist_url="https://youtube.com/playlist?list=PL_TEST",
+                playlist_name="Settings Playlist",
+                tracks={},
+            )
+        )
+
+        # Act: Update cookies settings to Brave
+        response = client.post(
+            "/settings/cookies",
+            data={"cookies_browser": "brave"},
+        )
+
+        # Assert
+        assert response.status_code == 200
+        loaded = manager.load()
+        assert loaded.config.cookies_browser == "brave"
+        assert "brave" in response.text.lower()
+
+    @patch("yt_sync_web.__main__.PlaylistExtractor")
+    def test_post_sync_passes_cookies_to_extractor(
+        self, mock_extractor_class: MagicMock, client: TestClient, tmp_path: Path
+    ) -> None:
+        # Arrange
+        sync_folder = tmp_path / "sync_cookies"
+        sync_folder.mkdir()
+        app.state.target_dir = sync_folder
+
+        manager = StateManager(target_dir=sync_folder)
+        manager.save(
+            SyncState(
+                playlist_url="https://youtube.com/playlist?list=PL_TEST",
+                playlist_name="My Playlist",
+                tracks={},
+                config=SyncConfig(cookies_browser="chrome"),
+            )
+        )
+
+        mock_extractor = mock_extractor_class.return_value
+        mock_extractor.fetch_playlist_details.return_value = (
+            "My Playlist",
+            [RemoteTrack(video_id="c1", title="Track C1", is_available=True)],
+        )
+
+        # Act
+        response = client.post("/sync")
+
+        # Assert
+        assert response.status_code == 200
+        mock_extractor.download_tracks.assert_called_once()
+        call_kwargs = mock_extractor.download_tracks.call_args[1]
+        assert call_kwargs["cookies_browser"] == "chrome"
+        loaded = manager.load()
+        assert loaded.config.cookies_browser == "chrome"

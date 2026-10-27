@@ -134,6 +134,40 @@ class TestCLIParser:
         # Assert
         assert args.trim == [["id1", "00:15", "03:45"]]
 
+    def test_parser_default_cookies_are_none(self) -> None:
+        # Arrange
+        parser = build_parser()
+        args_list = ["/tmp/music"]
+
+        # Act
+        args = parser.parse_args(args_list)
+
+        # Assert
+        assert args.cookies_browser is None
+        assert args.cookies_file is None
+
+    def test_parser_with_cookies_browser(self) -> None:
+        # Arrange
+        parser = build_parser()
+        args_list = ["/tmp/music", "--cookies-browser", "firefox"]
+
+        # Act
+        args = parser.parse_args(args_list)
+
+        # Assert
+        assert args.cookies_browser == "firefox"
+
+    def test_parser_with_cookies_file(self) -> None:
+        # Arrange
+        parser = build_parser()
+        args_list = ["/tmp/music", "--cookies-file", "/path/to/cookies.txt"]
+
+        # Act
+        args = parser.parse_args(args_list)
+
+        # Assert
+        assert args.cookies_file == "/path/to/cookies.txt"
+
 
 class TestCLIRunSync:
     """Validate run_sync execution flow."""
@@ -330,3 +364,88 @@ class TestCLIRunSync:
         state = manager.load()
         assert state.tracks["id1"].trim_start == "00:15"
         assert state.tracks["id1"].trim_end == "03:45"
+
+    def test_run_sync_with_cookies_browser_and_saves_state(
+        self, tmp_path: Path
+    ) -> None:
+        # Arrange
+        target_dir = tmp_path / "downloads_cookies_browser"
+        mock_extractor = MagicMock()
+        mock_extractor.fetch_playlist.return_value = [
+            RemoteTrack(video_id="id1", title="Track 1", is_available=True)
+        ]
+
+        # Act
+        exit_code = run_sync(
+            target_dir=target_dir,
+            playlist_url="https://youtube.com/playlist?list=xyz",
+            cookies_browser="firefox",
+            extractor=mock_extractor,
+        )
+
+        # Assert
+        assert exit_code == 0
+        call_kwargs = mock_extractor.download_tracks.call_args[1]
+        assert call_kwargs["cookies_browser"] == "firefox"
+        manager = StateManager(target_dir=target_dir)
+        state = manager.load()
+        assert state.config.cookies_browser == "firefox"
+
+    def test_run_sync_with_cookies_file_and_saves_state(
+        self, tmp_path: Path
+    ) -> None:
+        # Arrange
+        target_dir = tmp_path / "downloads_cookies_file"
+        mock_extractor = MagicMock()
+        mock_extractor.fetch_playlist.return_value = [
+            RemoteTrack(video_id="id1", title="Track 1", is_available=True)
+        ]
+
+        # Act
+        exit_code = run_sync(
+            target_dir=target_dir,
+            playlist_url="https://youtube.com/playlist?list=xyz",
+            cookies_file="/path/to/cookies.txt",
+            extractor=mock_extractor,
+        )
+
+        # Assert
+        assert exit_code == 0
+        call_kwargs = mock_extractor.download_tracks.call_args[1]
+        assert call_kwargs["cookies_file"] == "/path/to/cookies.txt"
+        manager = StateManager(target_dir=target_dir)
+        state = manager.load()
+        assert state.config.cookies_file == "/path/to/cookies.txt"
+
+    def test_run_sync_inherits_saved_cookies_from_state(
+        self, tmp_path: Path
+    ) -> None:
+        # Arrange
+        from yt_sync_core.models import SyncConfig, SyncState
+
+        target_dir = tmp_path / "downloads_saved_cookies"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        manager = StateManager(target_dir=target_dir)
+        manager.save(
+            SyncState(
+                playlist_url="https://youtube.com/playlist?list=xyz",
+                config=SyncConfig(cookies_browser="brave"),
+            )
+        )
+        mock_extractor = MagicMock()
+        mock_extractor.fetch_playlist.return_value = [
+            RemoteTrack(video_id="id1", title="Track 1", is_available=True)
+        ]
+
+        # Act
+        exit_code = run_sync(
+            target_dir=target_dir,
+            extractor=mock_extractor,
+        )
+
+        # Assert
+        assert exit_code == 0
+        call_kwargs = mock_extractor.download_tracks.call_args[1]
+        assert call_kwargs["cookies_browser"] == "brave"
+        reloaded = manager.load()
+        assert reloaded.config.cookies_browser == "brave"

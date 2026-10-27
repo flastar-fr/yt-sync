@@ -60,6 +60,18 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="SPEC",
         help="Specify surgical trim for a track: --trim <video_id> <start> [<end>]",
     )
+    parser.add_argument(
+        "--cookies-browser",
+        type=str,
+        default=None,
+        help="Browser name to extract YouTube cookies from (e.g. firefox, chrome, brave, edge).",
+    )
+    parser.add_argument(
+        "--cookies-file",
+        type=str,
+        default=None,
+        help="Path to a cookies.txt file for YouTube authentication.",
+    )
     return parser
 
 
@@ -119,17 +131,12 @@ def run_sync(
     normalize_audio: bool = True,
     audio_format: str = "m4a",
     enable_sponsorblock: bool = True,
+    cookies_browser: str | None = None,
+    cookies_file: str | None = None,
     track_trims: dict[str, tuple[str | None, str | None]] | None = None,
     extractor: PlaylistExtractor | None = None,
 ) -> int:
     """Execute the end-to-end synchronization workflow."""
-    if extractor is None:
-        extractor = PlaylistExtractor(
-            normalize_audio=normalize_audio,
-            audio_format=audio_format,
-            enable_sponsorblock=enable_sponsorblock,
-        )
-
     # 1. Target directory validation and preparation
     target_dir = target_dir.resolve()
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -143,6 +150,26 @@ def run_sync(
     except StorageError as exc:
         print(f"❌ Error loading local state: {exc}", file=sys.stderr)
         return 1
+
+    effective_cookies_browser = (
+        cookies_browser
+        if cookies_browser is not None
+        else current_state.config.cookies_browser
+    )
+    effective_cookies_file = (
+        cookies_file
+        if cookies_file is not None
+        else current_state.config.cookies_file
+    )
+
+    if extractor is None:
+        extractor = PlaylistExtractor(
+            normalize_audio=normalize_audio,
+            audio_format=audio_format,
+            enable_sponsorblock=enable_sponsorblock,
+            cookies_browser=effective_cookies_browser,
+            cookies_file=effective_cookies_file,
+        )
 
     # Resolve playlist URL
     effective_url = playlist_url or current_state.playlist_url
@@ -210,6 +237,8 @@ def run_sync(
                 normalize_audio=normalize_audio,
                 audio_format=audio_format,
                 enable_sponsorblock=enable_sponsorblock,
+                cookies_browser=effective_cookies_browser,
+                cookies_file=effective_cookies_file,
                 track_trims=merged_trims or None,
             )
             # Mark successfully downloaded tracks
@@ -254,6 +283,8 @@ def run_sync(
             normalize_audio=normalize_audio,
             audio_format=audio_format,
             enable_sponsorblock=enable_sponsorblock,
+            cookies_browser=effective_cookies_browser,
+            cookies_file=effective_cookies_file,
         ),
     )
     try:
@@ -295,6 +326,8 @@ def main(argv: list[str] | None = None) -> None:
         normalize_audio=not args.no_normalize,
         audio_format=args.format,
         enable_sponsorblock=not args.no_sponsorblock,
+        cookies_browser=args.cookies_browser,
+        cookies_file=args.cookies_file,
         track_trims=parsed_trims or None,
     )
     if exit_code != 0:

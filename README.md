@@ -49,7 +49,8 @@ yt_sync/
 - [x] **Unavailable Tracks Recovery**: Tracks that became private or deleted on YouTube are flagged while retaining their last known original title.
 - [x] **Atomic State Persistence**: Local state is tracked in `.yt_sync_state.json` via atomic writes (`os.replace`) to avoid corruption.
 - [x] **Multiple Interfaces**: Fast terminal CLI with progress reporting and interactive web dashboard using HTMX 2 with manual polling.
-- [x] **Comprehensive Test Suite**: 100% unit-tested core logic adhering to the AAA pattern (145 tests, 0 warnings).
+- [x] **Comprehensive Test Suite**: 100% unit-tested core logic adhering to the AAA pattern (164 tests, 0 warnings).
+- [x] **YouTube Bot Check Bypass (Cookies & Android Client Fallback)**: Extract cookies directly from installed browsers (`firefox`, `chrome`, `brave`, `edge`, `chromium`) or a `cookies.txt` file to resolve YouTube bot verification challenges ("Sign in to confirm you're not a bot").
 
 ### Roadmap (Planned Features)
 - [x] **Audio Loudness Normalization (Equalizer / Volume Leveler)**: Normalize audio levels across downloaded tracks (e.g., EBU R128 / ReplayGain post-processing) so all songs play at a consistent perceived volume.
@@ -111,6 +112,12 @@ uv run --package yt-sync-cli python -m yt_sync_cli /path/to/music_dir "https://w
 
 # Run with custom audio format, SponsorBlock, or surgical trim:
 uv run --package yt-sync-cli python -m yt_sync_cli /path/to/music_dir --format mp3 --trim dQw4w9WgXcQ 00:15 03:30
+
+# Synchronize using browser cookies authentication (bypassing "Sign in to confirm you're not a bot"):
+uv run --package yt-sync-cli python -m yt_sync_cli /path/to/music_dir --cookies-browser firefox
+
+# Alternatively, synchronize using a cookies.txt file:
+uv run --package yt-sync-cli python -m yt_sync_cli /path/to/music_dir --cookies-file /path/to/cookies.txt
 ```
 
 ---

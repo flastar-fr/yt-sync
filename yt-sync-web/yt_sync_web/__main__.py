@@ -181,6 +181,8 @@ def _build_dashboard_context(
         "audio_format": state.config.audio_format,
         "audio_quality": state.config.audio_quality,
         "enable_sponsorblock": state.config.enable_sponsorblock,
+        "cookies_browser": state.config.cookies_browser,
+        "cookies_file": state.config.cookies_file,
     }
 
 
@@ -254,6 +256,8 @@ async def post_initialize(
     normalize_audio: str | None = Form(default=None),
     audio_format: str | None = Form(default=None),
     enable_sponsorblock: str | None = Form(default=None),
+    cookies_browser: str | None = Form(default=None),
+    cookies_file: str | None = Form(default=None),
     init_form: str | None = Form(default=None),
 ) -> HTMLResponse:
     """Initialize state for target directory by querying remote playlist metadata."""
@@ -283,10 +287,23 @@ async def post_initialize(
 
     should_format = audio_format if audio_format in ("m4a", "mp3") else "m4a"
 
+    clean_cookies_browser = (
+        cookies_browser.strip()
+        if cookies_browser and cookies_browser.strip() not in ("none", "None", "")
+        else None
+    )
+    clean_cookies_file = (
+        cookies_file.strip()
+        if cookies_file and cookies_file.strip()
+        else None
+    )
+
     extractor = PlaylistExtractor(
         normalize_audio=should_normalize,
         audio_format=should_format,
         enable_sponsorblock=should_sponsorblock,
+        cookies_browser=clean_cookies_browser,
+        cookies_file=clean_cookies_file,
     )
     try:
         # Offload yt-dlp metadata extraction to thread pool
@@ -330,6 +347,8 @@ async def post_initialize(
             normalize_audio=should_normalize,
             audio_format=should_format,
             enable_sponsorblock=should_sponsorblock,
+            cookies_browser=clean_cookies_browser,
+            cookies_file=clean_cookies_file,
         ),
     )
 
@@ -372,7 +391,9 @@ async def post_refresh(request: Request) -> HTMLResponse:
             context={"error_message": "No playlist URL linked to this folder."},
         )
 
-    extractor = PlaylistExtractor()
+    extractor = PlaylistExtractor(
+        config=current_state.config,
+    )
     diff_engine = DiffEngine()
 
     try:
@@ -418,6 +439,8 @@ async def post_sync(
     normalize_audio: str | None = Form(default=None),
     audio_format: str | None = Form(default=None),
     enable_sponsorblock: str | None = Form(default=None),
+    cookies_browser: str | None = Form(default=None),
+    cookies_file: str | None = Form(default=None),
     sync_form: str | None = Form(default=None),
 ) -> HTMLResponse:
     """Download missing tracks in background thread pool and update local state."""
@@ -465,6 +488,24 @@ async def post_sync(
     else:
         should_format = current_state.config.audio_format
 
+    if cookies_browser is not None:
+        clean_cookies_browser = (
+            cookies_browser.strip()
+            if cookies_browser.strip() not in ("none", "None", "")
+            else None
+        )
+    else:
+        clean_cookies_browser = current_state.config.cookies_browser
+
+    if cookies_file is not None:
+        clean_cookies_file = (
+            cookies_file.strip()
+            if cookies_file.strip()
+            else None
+        )
+    else:
+        clean_cookies_file = current_state.config.cookies_file
+
     extractor = PlaylistExtractor(
         normalize_audio=should_normalize,
         audio_format=should_format,
@@ -502,6 +543,8 @@ async def post_sync(
                 ids_to_download,
                 output_dir=str(target_dir),
                 enable_sponsorblock=should_sponsorblock,
+                cookies_browser=clean_cookies_browser,
+                cookies_file=clean_cookies_file,
                 track_trims=current_state.tracks,
             )
             for new_t in diff.new_tracks:
@@ -539,6 +582,8 @@ async def post_sync(
             audio_format=should_format,
             audio_quality=current_state.config.audio_quality,
             enable_sponsorblock=should_sponsorblock,
+            cookies_browser=clean_cookies_browser,
+            cookies_file=clean_cookies_file,
         ),
     )
 
@@ -554,6 +599,72 @@ async def post_sync(
     # Re-evaluate diff post-sync
     post_diff = diff_engine.compute(remote_tracks=remote_tracks, current_state=new_state)
     context = _build_dashboard_context(new_state, target_dir, diff=post_diff)
+    return templates.TemplateResponse(
+        request=request,
+        name="fragments/dashboard.html",
+        context=context,
+    )
+
+
+@app.post("/settings/cookies", response_class=HTMLResponse)
+async def post_settings_cookies(
+    request: Request,
+    cookies_browser: str | None = Form(default=None),
+    cookies_file: str | None = Form(default=None),
+) -> HTMLResponse:
+    """Configure or update browser/file cookies authentication."""
+    target_dir = _get_target_dir(request)
+    state_manager = StateManager(target_dir=target_dir)
+
+    try:
+        current_state = state_manager.load()
+    except StorageError as exc:
+        return templates.TemplateResponse(
+            request=request,
+            name="fragments/error.html",
+            context={"error_message": f"Could not load state: {exc}"},
+        )
+
+    clean_cookies_browser = (
+        cookies_browser.strip()
+        if cookies_browser and cookies_browser.strip() not in ("none", "None", "")
+        else None
+    )
+    clean_cookies_file = (
+        cookies_file.strip()
+        if cookies_file and cookies_file.strip()
+        else None
+    )
+
+    new_config = SyncConfig(
+        normalize_audio=current_state.config.normalize_audio,
+        target_lufs=current_state.config.target_lufs,
+        true_peak=current_state.config.true_peak,
+        audio_format=current_state.config.audio_format,
+        audio_quality=current_state.config.audio_quality,
+        enable_sponsorblock=current_state.config.enable_sponsorblock,
+        cookies_browser=clean_cookies_browser,
+        cookies_file=clean_cookies_file,
+    )
+
+    new_state = SyncState(
+        playlist_url=current_state.playlist_url,
+        playlist_name=current_state.playlist_name,
+        last_synced_at=current_state.last_synced_at,
+        tracks=current_state.tracks,
+        config=new_config,
+    )
+
+    try:
+        state_manager.save(new_state)
+    except StorageError as exc:
+        return templates.TemplateResponse(
+            request=request,
+            name="fragments/error.html",
+            context={"error_message": f"Failed to save state: {exc}"},
+        )
+
+    context = _build_dashboard_context(new_state, target_dir)
     return templates.TemplateResponse(
         request=request,
         name="fragments/dashboard.html",

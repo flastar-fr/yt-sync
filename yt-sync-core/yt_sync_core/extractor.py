@@ -72,6 +72,8 @@ class PlaylistExtractor:
         audio_format: Literal["m4a", "mp3"] = "m4a",
         audio_quality: str = "192",
         enable_sponsorblock: bool = True,
+        cookies_browser: str | None = None,
+        cookies_file: str | None = None,
     ) -> None:
         if config is not None:
             self._config = config
@@ -83,6 +85,8 @@ class PlaylistExtractor:
                 audio_format=audio_format,
                 audio_quality=audio_quality,
                 enable_sponsorblock=enable_sponsorblock,
+                cookies_browser=cookies_browser,
+                cookies_file=cookies_file,
             )
 
     @property
@@ -111,7 +115,17 @@ class PlaylistExtractor:
             "no_warnings": True,
             "ignoreerrors": True,
             "extract_flat": True,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android", "web"]
+                }
+            },
         }
+
+        if self._config.cookies_browser:
+            opts["cookiesfrombrowser"] = (self._config.cookies_browser,)
+        elif self._config.cookies_file:
+            opts["cookiefile"] = self._config.cookies_file
 
         with yt_dlp.YoutubeDL(opts) as ydl:
             info: dict[str, Any] | None = ydl.extract_info(url, download=False)
@@ -156,6 +170,8 @@ class PlaylistExtractor:
         audio_format: Literal["m4a", "mp3"] | str | None = None,
         audio_quality: str | None = None,
         enable_sponsorblock: bool | None = None,
+        cookies_browser: str | None = None,
+        cookies_file: str | None = None,
         track_trims: (
             dict[str, tuple[str | None, str | None] | TrackSnapshot | dict[str, Any]]
             | None
@@ -174,6 +190,8 @@ class PlaylistExtractor:
             audio_format: Optional override for target audio format ("m4a" or "mp3").
             audio_quality: Optional override for audio quality (e.g. "192").
             enable_sponsorblock: Optional override for SponsorBlock non-music removal.
+            cookies_browser: Optional override for browser cookies authentication.
+            cookies_file: Optional override for cookies.txt file authentication.
             track_trims: Optional mapping of video_id to (trim_start, trim_end) tuples
                 or TrackSnapshot instances for surgical per-track trimming.
             config: Optional SyncConfig instance overriding default settings.
@@ -204,6 +222,16 @@ class PlaylistExtractor:
             if enable_sponsorblock is not None
             else effective_cfg.enable_sponsorblock
         )
+        eff_cookies_browser = (
+            cookies_browser
+            if cookies_browser is not None
+            else effective_cfg.cookies_browser
+        )
+        eff_cookies_file = (
+            cookies_file
+            if cookies_file is not None
+            else effective_cfg.cookies_file
+        )
 
         hooks: list[Callable[[dict[str, Any]], None]] = []
         if progress_callback is not None:
@@ -216,6 +244,11 @@ class PlaylistExtractor:
             "outtmpl": f"{output_dir}/%(title)s.%(ext)s",
             "format": "bestaudio/best",
             "progress_hooks": hooks,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android", "web"]
+                }
+            },
             "postprocessors": [
                 {
                     "key": "FFmpegExtractAudio",
@@ -224,6 +257,11 @@ class PlaylistExtractor:
                 }
             ],
         }
+
+        if eff_cookies_browser:
+            opts["cookiesfrombrowser"] = (eff_cookies_browser,)
+        elif eff_cookies_file:
+            opts["cookiefile"] = eff_cookies_file
 
         if eff_sponsorblock:
             opts["sponsorblock_remove"] = ["music_offtopic"]
