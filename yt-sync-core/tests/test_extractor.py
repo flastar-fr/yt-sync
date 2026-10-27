@@ -420,9 +420,11 @@ class TestPlaylistExtractorDownloadTracks:
         call_kwargs = MockYDL.call_args[0][0]
         assert "postprocessors" in call_kwargs
         postprocessors = call_kwargs["postprocessors"]
-        assert postprocessors[0]["key"] == "FFmpegExtractAudio"
-        assert postprocessors[0]["preferredcodec"] == "m4a"
-        assert postprocessors[0]["preferredquality"] == "192"
+        extract_audio_pp = next(
+            p for p in postprocessors if p.get("key") == "FFmpegExtractAudio"
+        )
+        assert extract_audio_pp["preferredcodec"] == "m4a"
+        assert extract_audio_pp["preferredquality"] == "192"
 
     @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
     def test_download_tracks_with_mp3_format_transmits_preferredcodec_mp3(
@@ -438,7 +440,10 @@ class TestPlaylistExtractorDownloadTracks:
         call_kwargs = MockYDL.call_args[0][0]
         assert "postprocessors" in call_kwargs
         postprocessors = call_kwargs["postprocessors"]
-        assert postprocessors[0]["preferredcodec"] == "mp3"
+        extract_audio_pp = next(
+            p for p in postprocessors if p.get("key") == "FFmpegExtractAudio"
+        )
+        assert extract_audio_pp["preferredcodec"] == "mp3"
 
     @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
     def test_download_tracks_with_sponsorblock_enabled_passes_sponsorblock_remove(
@@ -453,6 +458,30 @@ class TestPlaylistExtractorDownloadTracks:
         # Assert
         call_kwargs = MockYDL.call_args[0][0]
         assert call_kwargs.get("sponsorblock_remove") == ["music_offtopic"]
+        assert call_kwargs["postprocessors"] == [
+            {"key": "SponsorBlock"},
+            {"key": "ModifyChapters", "remove_sponsor_segments": ["music_offtopic"]},
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "m4a",
+                "preferredquality": "192",
+            },
+        ]
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_orders_modify_chapters_before_extract_audio(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor(enable_sponsorblock=True)
+        # Act
+        extractor.download_tracks(["vid001"], output_dir="/tmp/music")
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        keys = [pp["key"] for pp in call_kwargs["postprocessors"]]
+        assert keys == ["SponsorBlock", "ModifyChapters", "FFmpegExtractAudio"]
 
     @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
     def test_download_tracks_with_sponsorblock_disabled_omits_sponsorblock_remove(
@@ -469,6 +498,13 @@ class TestPlaylistExtractorDownloadTracks:
         # Assert
         call_kwargs = MockYDL.call_args[0][0]
         assert "sponsorblock_remove" not in call_kwargs
+        assert call_kwargs["postprocessors"] == [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "m4a",
+                "preferredquality": "192",
+            },
+        ]
 
     @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
     def test_download_tracks_extractor_level_sponsorblock_disabled_omits_sponsorblock_remove(
@@ -483,6 +519,13 @@ class TestPlaylistExtractorDownloadTracks:
         # Assert
         call_kwargs = MockYDL.call_args[0][0]
         assert "sponsorblock_remove" not in call_kwargs
+        assert call_kwargs["postprocessors"] == [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "m4a",
+                "preferredquality": "192",
+            },
+        ]
 
     @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
     def test_download_tracks_applies_trim_start_and_trim_end_to_track(

@@ -249,13 +249,6 @@ class PlaylistExtractor:
                     "player_client": ["android", "web"]
                 }
             },
-            "postprocessors": [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": eff_audio_format,
-                    "preferredquality": eff_audio_quality,
-                }
-            ],
         }
 
         if eff_cookies_browser:
@@ -263,8 +256,27 @@ class PlaylistExtractor:
         elif eff_cookies_file:
             opts["cookiefile"] = eff_cookies_file
 
+        postprocessors: list[dict[str, Any]] = []
         if eff_sponsorblock:
             opts["sponsorblock_remove"] = ["music_offtopic"]
+            postprocessors.extend(
+                [
+                    {"key": "SponsorBlock"},
+                    {
+                        "key": "ModifyChapters",
+                        "remove_sponsor_segments": ["music_offtopic"],
+                    },
+                ]
+            )
+
+        postprocessors.append(
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": eff_audio_format,
+                "preferredquality": eff_audio_quality,
+            }
+        )
+        opts["postprocessors"] = postprocessors
 
         def _get_track_trim(vid: str) -> tuple[str | None, str | None]:
             if not track_trims or vid not in track_trims:
