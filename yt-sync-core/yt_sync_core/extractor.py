@@ -115,6 +115,7 @@ class PlaylistExtractor:
             "no_warnings": True,
             "ignoreerrors": True,
             "extract_flat": True,
+            "remote_components": {"ejs:github"},
         }
 
         if self._config.cookies_browser:
@@ -243,6 +244,7 @@ class PlaylistExtractor:
             "outtmpl": f"{output_dir}/%(title)s.%(ext)s",
             "format": "bestaudio/best",
             "progress_hooks": hooks,
+            "remote_components": {"ejs:github"},
         }
 
         if eff_cookies_browser:

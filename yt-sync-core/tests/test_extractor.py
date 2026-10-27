@@ -219,6 +219,20 @@ class TestPlaylistExtractorFetchPlaylist:
         assert "cookiefile" not in call_kwargs
 
     @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_fetch_playlist_includes_remote_components_ejs_github(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock(_FAKE_PLAYLIST_INFO)
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.fetch_playlist(PLAYLIST_URL)
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert call_kwargs.get("remote_components") == {"ejs:github"}
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
     def test_fetch_playlist_with_cookies_browser(
         self, MockYDL: MagicMock
     ) -> None:
@@ -620,6 +634,20 @@ class TestPlaylistExtractorDownloadTracks:
         assert call_kwargs["extractor_args"]["youtube"]["player_client"] == ["android", "web"]
         assert "cookiesfrombrowser" not in call_kwargs
         assert "cookiefile" not in call_kwargs
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_includes_remote_components_ejs_github(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.download_tracks(["vid001"], output_dir="/tmp/music")
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert call_kwargs.get("remote_components") == {"ejs:github"}
 
     @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
     def test_download_tracks_with_cookies_browser_transmits_cookiesfrombrowser(
