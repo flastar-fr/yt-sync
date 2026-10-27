@@ -48,6 +48,28 @@ class TestCLIParser:
         # Assert
         assert args.dry_run is True
 
+    def test_parser_default_no_normalize_is_false(self) -> None:
+        # Arrange
+        parser = build_parser()
+        args_list = ["/tmp/music"]
+
+        # Act
+        args = parser.parse_args(args_list)
+
+        # Assert
+        assert args.no_normalize is False
+
+    def test_parser_with_no_normalize_flag(self) -> None:
+        # Arrange
+        parser = build_parser()
+        args_list = ["/tmp/music", "--no-normalize"]
+
+        # Act
+        args = parser.parse_args(args_list)
+
+        # Assert
+        assert args.no_normalize is True
+
 
 class TestCLIRunSync:
     """Validate run_sync execution flow."""
@@ -138,3 +160,29 @@ class TestCLIRunSync:
 
         # Assert
         assert exit_code == 1
+
+    def test_run_sync_with_no_normalize_flag_disables_loudnorm_and_saves_config(
+        self, tmp_path: Path
+    ) -> None:
+        # Arrange
+        target_dir = tmp_path / "downloads_no_norm"
+        mock_extractor = MagicMock()
+        mock_extractor.fetch_playlist.return_value = [
+            RemoteTrack(video_id="id1", title="Track 1", is_available=True)
+        ]
+
+        # Act
+        exit_code = run_sync(
+            target_dir=target_dir,
+            playlist_url="https://youtube.com/playlist?list=xyz",
+            normalize_audio=False,
+            extractor=mock_extractor,
+        )
+
+        # Assert
+        assert exit_code == 0
+        call_kwargs = mock_extractor.download_tracks.call_args[1]
+        assert call_kwargs["normalize_audio"] is False
+        manager = StateManager(target_dir=target_dir)
+        state = manager.load()
+        assert state.config.normalize_audio is False

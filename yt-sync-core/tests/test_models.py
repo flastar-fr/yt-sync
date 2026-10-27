@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from yt_sync_core.models import SyncState, TrackSnapshot, TrackStatus
+from yt_sync_core.models import SyncConfig, SyncState, TrackSnapshot, TrackStatus
 
 
 # ---------------------------------------------------------------------------
@@ -189,3 +189,80 @@ class TestSyncStateCreation:
         # Assert
         assert len(state.tracks) == 2
         assert state.tracks["b002"].status == TrackStatus.ERROR
+
+
+# ---------------------------------------------------------------------------
+# SyncConfig & Normalization
+# ---------------------------------------------------------------------------
+
+
+class TestSyncConfig:
+    """Vérifie la configuration de synchronisation et de normalisation audio."""
+
+    def test_default_sync_config_values(self) -> None:
+        # Arrange / Act
+        config = SyncConfig()
+        # Assert
+        assert config.normalize_audio is True
+        assert config.target_lufs == -14.0
+        assert config.true_peak == -1.5
+
+    def test_custom_sync_config_values(self) -> None:
+        # Arrange
+        normalize_audio = False
+        target_lufs = -16.0
+        true_peak = -2.0
+        # Act
+        config = SyncConfig(
+            normalize_audio=normalize_audio,
+            target_lufs=target_lufs,
+            true_peak=true_peak,
+        )
+        # Assert
+        assert config.normalize_audio is False
+        assert config.target_lufs == -16.0
+        assert config.true_peak == -2.0
+
+    def test_sync_state_default_config_has_normalization_enabled(self) -> None:
+        # Arrange / Act
+        state = SyncState()
+        # Assert
+        assert state.config.normalize_audio is True
+        assert state.config.target_lufs == -14.0
+        assert state.config.true_peak == -1.5
+        assert state.normalize_audio is True
+        assert state.target_lufs == -14.0
+        assert state.true_peak == -1.5
+
+    def test_sync_state_with_custom_config(self) -> None:
+        # Arrange
+        custom_cfg = SyncConfig(
+            normalize_audio=False,
+            target_lufs=-18.0,
+            true_peak=-1.0,
+        )
+        # Act
+        state = SyncState(config=custom_cfg)
+        # Assert
+        assert state.config.normalize_audio is False
+        assert state.config.target_lufs == -18.0
+        assert state.config.true_peak == -1.0
+        assert state.normalize_audio is False
+
+    def test_sync_state_serialization_round_trip_with_config(self) -> None:
+        # Arrange
+        original = SyncState(
+            config=SyncConfig(
+                normalize_audio=False,
+                target_lufs=-16.0,
+                true_peak=-2.0,
+            )
+        )
+        # Act
+        json_str = original.model_dump_json()
+        restored = SyncState.model_validate_json(json_str)
+        # Assert
+        assert restored == original
+        assert restored.config.normalize_audio is False
+        assert restored.config.target_lufs == -16.0
+        assert restored.config.true_peak == -2.0

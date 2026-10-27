@@ -10,7 +10,7 @@ from typing import Any
 from yt_sync_core.diff_engine import DiffEngine, DiffResult
 from yt_sync_core.exceptions import ExtractionError, StorageError
 from yt_sync_core.extractor import PlaylistExtractor
-from yt_sync_core.models import SyncState, TrackSnapshot, TrackStatus
+from yt_sync_core.models import SyncConfig, SyncState, TrackSnapshot, TrackStatus
 from yt_sync_core.storage import StateManager
 
 
@@ -36,6 +36,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="Perform differential analysis only without downloading tracks.",
+    )
+    parser.add_argument(
+        "--no-normalize",
+        action="store_true",
+        help="Disable EBU R128 audio loudness normalization.",
     )
     return parser
 
@@ -93,11 +98,12 @@ def run_sync(
     playlist_url: str | None = None,
     *,
     dry_run: bool = False,
+    normalize_audio: bool = True,
     extractor: PlaylistExtractor | None = None,
 ) -> int:
     """Execute the end-to-end synchronization workflow."""
     if extractor is None:
-        extractor = PlaylistExtractor()
+        extractor = PlaylistExtractor(normalize_audio=normalize_audio)
 
     # 1. Target directory validation and preparation
     target_dir = target_dir.resolve()
@@ -154,6 +160,7 @@ def run_sync(
                 ids_to_download,
                 output_dir=str(target_dir),
                 progress_callback=progress_hook,
+                normalize_audio=normalize_audio,
             )
             # Mark successfully downloaded tracks
             for new_t in diff.new_tracks:
@@ -184,8 +191,10 @@ def run_sync(
     # 6. Save updated synchronization state
     new_state = SyncState(
         playlist_url=effective_url,
+        playlist_name=current_state.playlist_name,
         last_synced_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         tracks=updated_tracks,
+        config=SyncConfig(normalize_audio=normalize_audio),
     )
     try:
         state_manager.save(new_state)
@@ -205,6 +214,7 @@ def main(argv: list[str] | None = None) -> None:
         target_dir=args.target_dir,
         playlist_url=args.playlist_url,
         dry_run=args.dry_run,
+        normalize_audio=not args.no_normalize,
     )
     if exit_code != 0:
         sys.exit(exit_code)

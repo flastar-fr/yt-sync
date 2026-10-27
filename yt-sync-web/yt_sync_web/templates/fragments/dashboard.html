@@ -42,6 +42,20 @@
                     </span>
                     {% endif %}
                 </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-zinc-500 w-24">Normalization:</span>
+                    {% if normalize_audio %}
+                    <span class="text-indigo-400 font-medium flex items-center gap-1.5 text-xs">
+                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                        EBU R128 Enabled ({{ target_lufs }} LUFS)
+                    </span>
+                    {% else %}
+                    <span class="text-zinc-500 font-medium flex items-center gap-1.5 text-xs">
+                        <span class="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
+                        Disabled
+                    </span>
+                    {% endif %}
+                </div>
             </div>
         </div>
 
@@ -55,13 +69,24 @@
             </button>
 
             {% if new_count > 0 %}
-            <button hx-post="/sync" hx-target="#dashboard-content" hx-swap="innerHTML" hx-indicator="#sync-spinner" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_25px_rgba(79,70,229,0.5)] flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                </svg>
-                Sync Missing Tracks ({{ new_count }})
-            </button>
+            <form hx-post="/sync" hx-target="#dashboard-content" hx-swap="innerHTML" hx-indicator="#sync-spinner" class="flex flex-wrap items-center gap-3">
+                <input type="hidden" name="sync_form" value="1">
+                <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer select-none bg-black/40 border border-white/5 px-3 py-2 rounded-xl hover:border-white/10 transition-colors">
+                    <input type="checkbox" name="normalize_audio" value="true" {% if normalize_audio %}checked{% endif %} class="rounded bg-zinc-800 border-white/10 text-indigo-600 focus:ring-indigo-500/50 h-4 w-4">
+                    <span>Audio Normalization (EBU R128)</span>
+                </label>
+                <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_25px_rgba(79,70,229,0.5)] flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    Sync Missing Tracks ({{ new_count }})
+                </button>
+            </form>
             {% else %}
+            <label class="flex items-center gap-2 text-xs text-zinc-500 select-none bg-black/20 border border-white/5 px-3 py-2 rounded-xl opacity-60">
+                <input type="checkbox" disabled {% if normalize_audio %}checked{% endif %} class="rounded bg-zinc-800 border-white/10 text-zinc-600 h-4 w-4">
+                <span>Audio Normalization (EBU R128)</span>
+            </label>
             <button disabled class="px-4 py-2 rounded-xl bg-zinc-900 border border-white/5 text-zinc-600 font-medium text-sm cursor-not-allowed flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />

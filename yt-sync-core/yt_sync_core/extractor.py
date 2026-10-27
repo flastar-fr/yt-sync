@@ -8,6 +8,7 @@ from typing import Any, Callable
 import yt_dlp
 
 from yt_sync_core.exceptions import ExtractionError
+from yt_sync_core.models import SyncConfig
 
 # yt-dlp statuses indicating that a video is no longer accessible
 _UNAVAILABLE_STATUSES: frozenset[str] = frozenset(
@@ -60,6 +61,28 @@ class PlaylistExtractor:
     All methods use ``yt_dlp.YoutubeDL`` as a context manager; no network
     requests are performed outside ``fetch_playlist`` and ``download_tracks``.
     """
+
+    def __init__(
+        self,
+        *,
+        config: SyncConfig | None = None,
+        normalize_audio: bool = True,
+        target_lufs: float = -14.0,
+        true_peak: float = -1.5,
+    ) -> None:
+        if config is not None:
+            self._config = config
+        else:
+            self._config = SyncConfig(
+                normalize_audio=normalize_audio,
+                target_lufs=target_lufs,
+                true_peak=true_peak,
+            )
+
+    @property
+    def config(self) -> SyncConfig:
+        """Active synchronization and audio normalization configuration."""
+        return self._config
 
     # ------------------------------------------------------------------
     # Metadata extraction
@@ -121,6 +144,10 @@ class PlaylistExtractor:
         *,
         output_dir: str,
         progress_callback: Callable[[dict[str, Any]], None] | None = None,
+        normalize_audio: bool | None = None,
+        target_lufs: float | None = None,
+        true_peak: float | None = None,
+        config: SyncConfig | None = None,
     ) -> None:
         """Download specified videos by their IDs.
 
@@ -128,9 +155,26 @@ class PlaylistExtractor:
             video_ids: List of YouTube video IDs to download.
             output_dir: Destination directory for audio files.
             progress_callback: Optional progress hook callback invoked by yt-dlp.
+            normalize_audio: Optional override for audio loudness normalization.
+            target_lufs: Optional override for target LUFS.
+            true_peak: Optional override for true peak level in dBTP.
+            config: Optional SyncConfig instance overriding default settings.
         """
         if not video_ids:
             return
+
+        effective_cfg = config or self._config
+        eff_normalize = (
+            normalize_audio
+            if normalize_audio is not None
+            else effective_cfg.normalize_audio
+        )
+        eff_target_lufs = (
+            target_lufs if target_lufs is not None else effective_cfg.target_lufs
+        )
+        eff_true_peak = (
+            true_peak if true_peak is not None else effective_cfg.true_peak
+        )
 
         hooks: list[Callable[[dict[str, Any]], None]] = []
         if progress_callback is not None:
@@ -144,6 +188,14 @@ class PlaylistExtractor:
             "format": "bestaudio/best",
             "progress_hooks": hooks,
         }
+
+        if eff_normalize:
+            opts["postprocessor_args"] = {
+                "ExtractAudio": [
+                    "-af",
+                    f"loudnorm=I={eff_target_lufs}:TP={eff_true_peak}:LRA=11",
+                ]
+            }
 
         urls = [f"https://www.youtube.com/watch?v={vid}" for vid in video_ids]
 

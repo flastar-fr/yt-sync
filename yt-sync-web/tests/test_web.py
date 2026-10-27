@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from yt_sync_core import __version__ as core_version
 from yt_sync_core.extractor import RemoteTrack
-from yt_sync_core.models import SyncState, TrackSnapshot, TrackStatus
+from yt_sync_core.models import SyncConfig, SyncState, TrackSnapshot, TrackStatus
 from yt_sync_core.storage import STATE_FILENAME, StateManager
 from yt_sync_web import __version__
 from yt_sync_web.__main__ import app
@@ -45,6 +45,7 @@ class TestWebDashboard:
         assert "text/html" in response.headers["content-type"]
         assert "htmx.org@2." in response.text
         assert "Initialize Folder Synchronization" in response.text
+        assert "Audio Normalization (EBU R128)" in response.text
         assert 'hx-post="/initialize"' in response.text
 
     @patch("yt_sync_web.__main__.PlaylistExtractor")
@@ -84,6 +85,7 @@ class TestWebDashboard:
         assert "Archived Old Song" in response.text
         assert "Check for Updates" in response.text
         assert 'hx-post="/refresh"' in response.text
+        assert "EBU R128 Enabled" in response.text
 
     @patch("yt_sync_web.__main__.PlaylistExtractor")
     def test_post_initialize_creates_state_and_returns_dashboard(
@@ -194,6 +196,41 @@ class TestWebDashboard:
         loaded = manager.load()
         assert loaded.tracks["new1"].status == TrackStatus.DOWNLOADED
         assert loaded.last_synced_at is not None
+
+    @patch("yt_sync_web.__main__.PlaylistExtractor")
+    def test_post_sync_with_normalization_disabled_via_form(
+        self, mock_extractor_class: MagicMock, client: TestClient, tmp_path: Path
+    ) -> None:
+        # Arrange
+        sync_folder = tmp_path / "sync_music_no_norm"
+        sync_folder.mkdir()
+        app.state.target_dir = sync_folder
+
+        manager = StateManager(target_dir=sync_folder)
+        manager.save(
+            SyncState(
+                playlist_url="https://youtube.com/playlist?list=PL_TEST",
+                playlist_name="My Playlist",
+                tracks={},
+                config=SyncConfig(normalize_audio=True),
+            )
+        )
+
+        mock_extractor = mock_extractor_class.return_value
+        mock_extractor.fetch_playlist_details.return_value = (
+            "My Playlist",
+            [RemoteTrack(video_id="new1", title="Track One", is_available=True)],
+        )
+
+        # Act: Submitting sync form with checkbox unticked (only sync_form sent)
+        response = client.post("/sync", data={"sync_form": "1"})
+
+        # Assert
+        assert response.status_code == 200
+        mock_extractor_class.assert_called_with(normalize_audio=False)
+        loaded = manager.load()
+        assert loaded.config.normalize_audio is False
+        assert "Audio Normalization (EBU R128)" in response.text
 
     def test_post_ignore_track_marks_status_as_skipped(
         self, client: TestClient, tmp_path: Path

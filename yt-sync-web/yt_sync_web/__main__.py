@@ -19,7 +19,7 @@ from fastapi.templating import Jinja2Templates
 from yt_sync_core.diff_engine import DiffEngine, DiffResult
 from yt_sync_core.exceptions import ExtractionError, StorageError, YtSyncError
 from yt_sync_core.extractor import PlaylistExtractor, RemoteTrack
-from yt_sync_core.models import SyncState, TrackSnapshot, TrackStatus
+from yt_sync_core.models import SyncConfig, SyncState, TrackSnapshot, TrackStatus
 from yt_sync_core.storage import STATE_FILENAME, StateManager
 
 app = FastAPI(
@@ -150,6 +150,9 @@ def _build_dashboard_context(
         "new_count": new_count,
         "unavailable_count": unavailable_count,
         "tracks": tracks,
+        "normalize_audio": state.config.normalize_audio,
+        "target_lufs": state.config.target_lufs,
+        "true_peak": state.config.true_peak,
     }
 
 
@@ -220,13 +223,25 @@ async def get_index(request: Request) -> HTMLResponse:
 async def post_initialize(
     request: Request,
     playlist_url: str = Form(...),
+    normalize_audio: str | None = Form(default=None),
+    init_form: str | None = Form(default=None),
 ) -> HTMLResponse:
     """Initialize state for target directory by querying remote playlist metadata."""
     target_dir = _get_target_dir(request)
     target_dir.mkdir(parents=True, exist_ok=True)
     state_manager = StateManager(target_dir=target_dir)
 
-    extractor = PlaylistExtractor()
+    if init_form is not None:
+        should_normalize = (
+            normalize_audio is not None
+            and normalize_audio.lower() in ("true", "1", "on")
+        )
+    elif normalize_audio is not None:
+        should_normalize = normalize_audio.lower() in ("true", "1", "on")
+    else:
+        should_normalize = True
+
+    extractor = PlaylistExtractor(normalize_audio=should_normalize)
     try:
         # Offload yt-dlp metadata extraction to thread pool
         title, remote_tracks = await asyncio.to_thread(
@@ -265,6 +280,7 @@ async def post_initialize(
         playlist_name=title,
         last_synced_at=None,
         tracks=initial_tracks,
+        config=SyncConfig(normalize_audio=should_normalize),
     )
 
     try:
@@ -330,6 +346,7 @@ async def post_refresh(request: Request) -> HTMLResponse:
             playlist_name=title,
             last_synced_at=current_state.last_synced_at,
             tracks=current_state.tracks,
+            config=current_state.config,
         )
         try:
             state_manager.save(updated_state)
@@ -346,7 +363,11 @@ async def post_refresh(request: Request) -> HTMLResponse:
 
 
 @app.post("/sync", response_class=HTMLResponse)
-async def post_sync(request: Request) -> HTMLResponse:
+async def post_sync(
+    request: Request,
+    normalize_audio: str | None = Form(default=None),
+    sync_form: str | None = Form(default=None),
+) -> HTMLResponse:
     """Download missing tracks in background thread pool and update local state."""
     target_dir = _get_target_dir(request)
     state_manager = StateManager(target_dir=target_dir)
@@ -367,7 +388,17 @@ async def post_sync(request: Request) -> HTMLResponse:
             context={"error_message": "No playlist URL configured."},
         )
 
-    extractor = PlaylistExtractor()
+    if sync_form is not None:
+        should_normalize = (
+            normalize_audio is not None
+            and normalize_audio.lower() in ("true", "1", "on")
+        )
+    elif normalize_audio is not None:
+        should_normalize = normalize_audio.lower() in ("true", "1", "on")
+    else:
+        should_normalize = current_state.config.normalize_audio
+
+    extractor = PlaylistExtractor(normalize_audio=should_normalize)
     diff_engine = DiffEngine()
 
     try:
@@ -422,6 +453,11 @@ async def post_sync(request: Request) -> HTMLResponse:
         playlist_name=title or current_state.playlist_name,
         last_synced_at=now_iso,
         tracks=updated_tracks,
+        config=SyncConfig(
+            normalize_audio=should_normalize,
+            target_lufs=current_state.config.target_lufs,
+            true_peak=current_state.config.true_peak,
+        ),
     )
 
     try:
@@ -473,6 +509,7 @@ async def post_ignore_track(request: Request, video_id: str) -> HTMLResponse:
             playlist_name=current_state.playlist_name,
             last_synced_at=current_state.last_synced_at,
             tracks=updated_tracks,
+            config=current_state.config,
         )
         try:
             state_manager.save(new_state)

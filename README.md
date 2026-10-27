@@ -52,7 +52,7 @@ yt_sync/
 - [x] **Comprehensive Test Suite**: 100% unit-tested core logic adhering to the AAA pattern (105+ tests, 0 warnings).
 
 ### Roadmap (Planned Features)
-- [ ] **Audio Loudness Normalization (Equalizer / Volume Leveler)**: Normalize audio levels across downloaded tracks (e.g., EBU R128 / ReplayGain post-processing) so all songs play at a consistent perceived volume.
+- [x] **Audio Loudness Normalization (Equalizer / Volume Leveler)**: Normalize audio levels across downloaded tracks (e.g., EBU R128 / ReplayGain post-processing) so all songs play at a consistent perceived volume.
 - [ ] **Configurable Audio Trimming (Intro & Outro Cut)**: Download tracks starting from *n* seconds/minutes or trim long silent/talking intros and outros.
 
 ---

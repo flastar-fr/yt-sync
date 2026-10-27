@@ -263,3 +263,83 @@ class TestPlaylistExtractorDownloadTracks:
         call_kwargs = MockYDL.call_args[0][0]
         assert "progress_hooks" in call_kwargs
         assert len(call_kwargs["progress_hooks"]) > 0
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_with_loudnorm_enabled_passes_postprocessor_args(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.download_tracks(["vid001"], output_dir="/tmp/music", normalize_audio=True)
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert "postprocessor_args" in call_kwargs
+        assert "ExtractAudio" in call_kwargs["postprocessor_args"]
+        assert "-af" in call_kwargs["postprocessor_args"]["ExtractAudio"]
+        assert "loudnorm=I=-14.0:TP=-1.5:LRA=11" in call_kwargs["postprocessor_args"]["ExtractAudio"]
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_with_custom_lufs_and_true_peak(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.download_tracks(
+            ["vid001"],
+            output_dir="/tmp/music",
+            normalize_audio=True,
+            target_lufs=-16.0,
+            true_peak=-2.0,
+        )
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert "loudnorm=I=-16.0:TP=-2.0:LRA=11" in call_kwargs["postprocessor_args"]["ExtractAudio"]
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_with_loudnorm_disabled_omits_loudnorm_filter(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.download_tracks(["vid001"], output_dir="/tmp/music", normalize_audio=False)
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert "postprocessor_args" not in call_kwargs
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_defaults_to_loudnorm_enabled(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.download_tracks(["vid001"], output_dir="/tmp/music")
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert "postprocessor_args" in call_kwargs
+        assert "loudnorm=I=-14.0:TP=-1.5:LRA=11" in call_kwargs["postprocessor_args"]["ExtractAudio"]
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_extractor_with_disabled_config_omits_loudnorm(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor(normalize_audio=False)
+        # Act
+        extractor.download_tracks(["vid001"], output_dir="/tmp/music")
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert "postprocessor_args" not in call_kwargs
