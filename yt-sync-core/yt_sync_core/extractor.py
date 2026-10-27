@@ -115,17 +115,14 @@ class PlaylistExtractor:
             "no_warnings": True,
             "ignoreerrors": True,
             "extract_flat": True,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["android", "web"]
-                }
-            },
         }
 
         if self._config.cookies_browser:
             opts["cookiesfrombrowser"] = (self._config.cookies_browser,)
         elif self._config.cookies_file:
             opts["cookiefile"] = self._config.cookies_file
+        else:
+            opts["extractor_args"] = {"youtube": {"player_client": ["android", "web"]}}
 
         with yt_dlp.YoutubeDL(opts) as ydl:
             info: dict[str, Any] | None = ydl.extract_info(url, download=False)
@@ -244,17 +241,14 @@ class PlaylistExtractor:
             "outtmpl": f"{output_dir}/%(title)s.%(ext)s",
             "format": "bestaudio/best",
             "progress_hooks": hooks,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["android", "web"]
-                }
-            },
         }
 
         if eff_cookies_browser:
             opts["cookiesfrombrowser"] = (eff_cookies_browser,)
         elif eff_cookies_file:
             opts["cookiefile"] = eff_cookies_file
+        else:
+            opts["extractor_args"] = {"youtube": {"player_client": ["android", "web"]}}
 
         postprocessors: list[dict[str, Any]] = []
         if eff_sponsorblock:
