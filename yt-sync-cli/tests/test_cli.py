@@ -101,6 +101,39 @@ class TestCLIParser:
         with pytest.raises(SystemExit):
             parser.parse_args(args_list)
 
+    def test_parser_default_no_sponsorblock_is_false(self) -> None:
+        # Arrange
+        parser = build_parser()
+        args_list = ["/tmp/music"]
+
+        # Act
+        args = parser.parse_args(args_list)
+
+        # Assert
+        assert args.no_sponsorblock is False
+
+    def test_parser_with_no_sponsorblock_flag(self) -> None:
+        # Arrange
+        parser = build_parser()
+        args_list = ["/tmp/music", "--no-sponsorblock"]
+
+        # Act
+        args = parser.parse_args(args_list)
+
+        # Assert
+        assert args.no_sponsorblock is True
+
+    def test_parser_with_trim_argument(self) -> None:
+        # Arrange
+        parser = build_parser()
+        args_list = ["/tmp/music", "--trim", "id1", "00:15", "03:45"]
+
+        # Act
+        args = parser.parse_args(args_list)
+
+        # Assert
+        assert args.trim == [["id1", "00:15", "03:45"]]
+
 
 class TestCLIRunSync:
     """Validate run_sync execution flow."""
@@ -243,3 +276,57 @@ class TestCLIRunSync:
         manager = StateManager(target_dir=target_dir)
         state = manager.load()
         assert state.config.audio_format == "mp3"
+
+    def test_run_sync_with_no_sponsorblock_flag_disables_sponsorblock_and_saves_config(
+        self, tmp_path: Path
+    ) -> None:
+        # Arrange
+        target_dir = tmp_path / "downloads_no_spb"
+        mock_extractor = MagicMock()
+        mock_extractor.fetch_playlist.return_value = [
+            RemoteTrack(video_id="id1", title="Track 1", is_available=True)
+        ]
+
+        # Act
+        exit_code = run_sync(
+            target_dir=target_dir,
+            playlist_url="https://youtube.com/playlist?list=xyz",
+            enable_sponsorblock=False,
+            extractor=mock_extractor,
+        )
+
+        # Assert
+        assert exit_code == 0
+        call_kwargs = mock_extractor.download_tracks.call_args[1]
+        assert call_kwargs["enable_sponsorblock"] is False
+        manager = StateManager(target_dir=target_dir)
+        state = manager.load()
+        assert state.config.enable_sponsorblock is False
+
+    def test_run_sync_with_trim_applies_trim_and_persists_in_state(
+        self, tmp_path: Path
+    ) -> None:
+        # Arrange
+        target_dir = tmp_path / "downloads_trim"
+        mock_extractor = MagicMock()
+        mock_extractor.fetch_playlist.return_value = [
+            RemoteTrack(video_id="id1", title="Track 1", is_available=True)
+        ]
+        track_trims = {"id1": ("00:15", "03:45")}
+
+        # Act
+        exit_code = run_sync(
+            target_dir=target_dir,
+            playlist_url="https://youtube.com/playlist?list=xyz",
+            track_trims=track_trims,
+            extractor=mock_extractor,
+        )
+
+        # Assert
+        assert exit_code == 0
+        call_kwargs = mock_extractor.download_tracks.call_args[1]
+        assert call_kwargs["track_trims"]["id1"] == ("00:15", "03:45")
+        manager = StateManager(target_dir=target_dir)
+        state = manager.load()
+        assert state.tracks["id1"].trim_start == "00:15"
+        assert state.tracks["id1"].trim_end == "03:45"

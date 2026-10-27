@@ -46,6 +46,7 @@ class TestWebDashboard:
         assert "htmx.org@2." in response.text
         assert "Initialize Folder Synchronization" in response.text
         assert "Audio Normalization (EBU R128)" in response.text
+        assert "Auto-cut video intros (SponsorBlock)" in response.text
         assert 'name="audio_format"' in response.text
         assert 'hx-post="/initialize"' in response.text
 
@@ -193,7 +194,12 @@ class TestWebDashboard:
 
         # Assert
         assert response.status_code == 200
-        mock_extractor.download_tracks.assert_called_once_with(["new1"], output_dir=str(sync_folder))
+        mock_extractor.download_tracks.assert_called_once_with(
+            ["new1"],
+            output_dir=str(sync_folder),
+            enable_sponsorblock=True,
+            track_trims={},
+        )
         loaded = manager.load()
         assert loaded.tracks["new1"].status == TrackStatus.DOWNLOADED
         assert loaded.last_synced_at is not None
@@ -228,7 +234,11 @@ class TestWebDashboard:
 
         # Assert
         assert response.status_code == 200
-        mock_extractor_class.assert_called_with(normalize_audio=False, audio_format="m4a")
+        mock_extractor_class.assert_called_with(
+            normalize_audio=False,
+            audio_format="m4a",
+            enable_sponsorblock=False,
+        )
         loaded = manager.load()
         assert loaded.config.normalize_audio is False
         assert "Audio Normalization (EBU R128)" in response.text
@@ -266,7 +276,11 @@ class TestWebDashboard:
 
         # Assert
         assert response.status_code == 200
-        mock_extractor_class.assert_called_with(normalize_audio=True, audio_format="mp3")
+        mock_extractor_class.assert_called_with(
+            normalize_audio=True,
+            audio_format="mp3",
+            enable_sponsorblock=False,
+        )
         loaded = manager.load()
         assert loaded.config.audio_format == "mp3"
         assert "mp3" in response.text.lower()
@@ -303,3 +317,92 @@ class TestWebDashboard:
         loaded = manager.load()
         assert loaded.tracks["del1"].status == TrackStatus.SKIPPED
         assert "Skipped" in response.text
+
+    def test_post_track_trim_updates_state_and_returns_dashboard(
+        self, client: TestClient, tmp_path: Path
+    ) -> None:
+        # Arrange
+        music_folder = tmp_path / "trim_music"
+        music_folder.mkdir()
+        app.state.target_dir = music_folder
+
+        manager = StateManager(target_dir=music_folder)
+        manager.save(
+            SyncState(
+                playlist_url="https://youtube.com/playlist?list=PL_TEST",
+                playlist_name="Trim Playlist",
+                tracks={
+                    "vid_trim": TrackSnapshot(
+                        video_id="vid_trim",
+                        title="Song to Trim",
+                        status=TrackStatus.PENDING,
+                    )
+                },
+            )
+        )
+
+        # Act: Set surgical trim for vid_trim
+        response = client.post(
+            "/track/vid_trim/trim",
+            data={"trim_start": "00:15", "trim_end": "03:45"},
+        )
+
+        # Assert
+        assert response.status_code == 200
+        loaded = manager.load()
+        assert loaded.tracks["vid_trim"].trim_start == "00:15"
+        assert loaded.tracks["vid_trim"].trim_end == "03:45"
+        assert "00:15" in response.text
+        assert "03:45" in response.text
+
+    @patch("yt_sync_web.__main__.PlaylistExtractor")
+    def test_post_sync_with_sponsorblock_and_track_trims(
+        self, mock_extractor_class: MagicMock, client: TestClient, tmp_path: Path
+    ) -> None:
+        # Arrange
+        sync_folder = tmp_path / "sync_music_spb"
+        sync_folder.mkdir()
+        app.state.target_dir = sync_folder
+
+        manager = StateManager(target_dir=sync_folder)
+        manager.save(
+            SyncState(
+                playlist_url="https://youtube.com/playlist?list=PL_TEST",
+                playlist_name="My Playlist",
+                tracks={
+                    "t1": TrackSnapshot(
+                        video_id="t1",
+                        title="Track One",
+                        status=TrackStatus.PENDING,
+                        trim_start="00:10",
+                        trim_end="02:50",
+                    )
+                },
+                config=SyncConfig(enable_sponsorblock=True),
+            )
+        )
+
+        mock_extractor = mock_extractor_class.return_value
+        mock_extractor.fetch_playlist_details.return_value = (
+            "My Playlist",
+            [RemoteTrack(video_id="t1", title="Track One", is_available=True)],
+        )
+
+        # Act
+        response = client.post(
+            "/sync",
+            data={"sync_form": "1", "enable_sponsorblock": "true"},
+        )
+
+        # Assert
+        assert response.status_code == 200
+        mock_extractor.download_tracks.assert_called_once()
+        call_kwargs = mock_extractor.download_tracks.call_args[1]
+        assert call_kwargs["enable_sponsorblock"] is True
+        assert "t1" in call_kwargs["track_trims"]
+        assert call_kwargs["track_trims"]["t1"].trim_start == "00:10"
+        loaded = manager.load()
+        assert loaded.tracks["t1"].status == TrackStatus.DOWNLOADED
+        assert loaded.tracks["t1"].trim_start == "00:10"
+        assert loaded.tracks["t1"].trim_end == "02:50"
+        assert loaded.config.enable_sponsorblock is True

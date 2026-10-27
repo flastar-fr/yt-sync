@@ -72,6 +72,28 @@ class TestTrackSnapshotCreation:
         # Assert
         assert snapshot.error_message is None
 
+    def test_default_trim_fields_are_none(self) -> None:
+        # Arrange / Act
+        snapshot = TrackSnapshot(video_id="abc123", title="Some Track")
+        # Assert
+        assert snapshot.trim_start is None
+        assert snapshot.trim_end is None
+
+    def test_snapshot_with_trim_fields(self) -> None:
+        # Arrange
+        trim_start = "00:15"
+        trim_end = "03:45"
+        # Act
+        snapshot = TrackSnapshot(
+            video_id="abc123",
+            title="Some Track",
+            trim_start=trim_start,
+            trim_end=trim_end,
+        )
+        # Assert
+        assert snapshot.trim_start == trim_start
+        assert snapshot.trim_end == trim_end
+
     def test_snapshot_with_explicit_status(self) -> None:
         # Arrange
         snapshot = TrackSnapshot(
@@ -208,6 +230,7 @@ class TestSyncConfig:
         assert config.true_peak == -1.5
         assert config.audio_format == "m4a"
         assert config.audio_quality == "192"
+        assert config.enable_sponsorblock is True
 
     def test_custom_sync_config_values(self) -> None:
         # Arrange
@@ -216,6 +239,7 @@ class TestSyncConfig:
         true_peak = -2.0
         audio_format = "mp3"
         audio_quality = "320"
+        enable_sponsorblock = False
         # Act
         config = SyncConfig(
             normalize_audio=normalize_audio,
@@ -223,6 +247,7 @@ class TestSyncConfig:
             true_peak=true_peak,
             audio_format=audio_format,
             audio_quality=audio_quality,
+            enable_sponsorblock=enable_sponsorblock,
         )
         # Assert
         assert config.normalize_audio is False
@@ -230,6 +255,7 @@ class TestSyncConfig:
         assert config.true_peak == -2.0
         assert config.audio_format == "mp3"
         assert config.audio_quality == "320"
+        assert config.enable_sponsorblock is False
 
     def test_sync_config_invalid_audio_format_raises(self) -> None:
         # Arrange / Act / Assert
@@ -245,11 +271,13 @@ class TestSyncConfig:
         assert state.config.true_peak == -1.5
         assert state.config.audio_format == "m4a"
         assert state.config.audio_quality == "192"
+        assert state.config.enable_sponsorblock is True
         assert state.normalize_audio is True
         assert state.target_lufs == -14.0
         assert state.true_peak == -1.5
         assert state.audio_format == "m4a"
         assert state.audio_quality == "192"
+        assert state.enable_sponsorblock is True
 
     def test_sync_state_with_custom_config(self) -> None:
         # Arrange
@@ -257,6 +285,7 @@ class TestSyncConfig:
             normalize_audio=False,
             target_lufs=-18.0,
             true_peak=-1.0,
+            enable_sponsorblock=False,
         )
         # Act
         state = SyncState(config=custom_cfg)
@@ -264,7 +293,9 @@ class TestSyncConfig:
         assert state.config.normalize_audio is False
         assert state.config.target_lufs == -18.0
         assert state.config.true_peak == -1.0
+        assert state.config.enable_sponsorblock is False
         assert state.normalize_audio is False
+        assert state.enable_sponsorblock is False
 
     def test_sync_state_serialization_round_trip_with_config(self) -> None:
         # Arrange
@@ -273,6 +304,7 @@ class TestSyncConfig:
                 normalize_audio=False,
                 target_lufs=-16.0,
                 true_peak=-2.0,
+                enable_sponsorblock=False,
             )
         )
         # Act
@@ -283,3 +315,21 @@ class TestSyncConfig:
         assert restored.config.normalize_audio is False
         assert restored.config.target_lufs == -16.0
         assert restored.config.true_peak == -2.0
+        assert restored.config.enable_sponsorblock is False
+
+    def test_sync_state_round_trip_preserves_track_trims(self) -> None:
+        # Arrange
+        track = TrackSnapshot(
+            video_id="vid_trim",
+            title="Trimmed Song",
+            trim_start="00:12",
+            trim_end="03:45",
+        )
+        original = SyncState(tracks={"vid_trim": track})
+        # Act
+        json_str = original.model_dump_json()
+        restored = SyncState.model_validate_json(json_str)
+        # Assert
+        assert restored == original
+        assert restored.tracks["vid_trim"].trim_start == "00:12"
+        assert restored.tracks["vid_trim"].trim_end == "03:45"

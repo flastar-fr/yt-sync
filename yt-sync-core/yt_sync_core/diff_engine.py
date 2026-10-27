@@ -85,6 +85,8 @@ class DiffEngine:
                         title=known_title,
                         status=TrackStatus.ERROR,
                         error_message="Track unavailable on YouTube",
+                        trim_start=snapshot.trim_start if snapshot else None,
+                        trim_end=snapshot.trim_end if snapshot else None,
                     )
                 )
                 continue

@@ -31,6 +31,8 @@ class TrackSnapshot(BaseModel):
     title: str = Field(..., min_length=1)
     status: TrackStatus = TrackStatus.PENDING
     error_message: str | None = None
+    trim_start: str | None = None
+    trim_end: str | None = None
 
     model_config = {"frozen": True}
 
@@ -44,6 +46,7 @@ class SyncConfig(BaseModel):
         true_peak: Maximum true peak level in dBTP (standard: -1.5 dBTP).
         audio_format: Target audio codec format ("m4a" or "mp3", default: "m4a").
         audio_quality: Target audio bitrate/quality string (default: "192").
+        enable_sponsorblock: Whether to automatically cut non-music segments via SponsorBlock.
     """
 
     normalize_audio: bool = True
@@ -51,6 +54,7 @@ class SyncConfig(BaseModel):
     true_peak: float = -1.5
     audio_format: Literal["m4a", "mp3"] = "m4a"
     audio_quality: str = "192"
+    enable_sponsorblock: bool = True
 
     model_config = {"frozen": True}
 
@@ -84,6 +88,7 @@ class SyncState(BaseModel):
                 "true_peak",
                 "audio_format",
                 "audio_quality",
+                "enable_sponsorblock",
             )
             if any(k in data for k in flat_keys):
                 existing_config = data.get("config")
@@ -126,3 +131,8 @@ class SyncState(BaseModel):
     def audio_quality(self) -> str:
         """Convenience property delegating to config.audio_quality."""
         return self.config.audio_quality
+
+    @property
+    def enable_sponsorblock(self) -> bool:
+        """Convenience property delegating to config.enable_sponsorblock."""
+        return self.config.enable_sponsorblock

@@ -8,7 +8,7 @@ from typing import Any, Callable, Literal
 import yt_dlp
 
 from yt_sync_core.exceptions import ExtractionError
-from yt_sync_core.models import SyncConfig
+from yt_sync_core.models import SyncConfig, TrackSnapshot
 
 # yt-dlp statuses indicating that a video is no longer accessible
 _UNAVAILABLE_STATUSES: frozenset[str] = frozenset(
@@ -71,6 +71,7 @@ class PlaylistExtractor:
         true_peak: float = -1.5,
         audio_format: Literal["m4a", "mp3"] = "m4a",
         audio_quality: str = "192",
+        enable_sponsorblock: bool = True,
     ) -> None:
         if config is not None:
             self._config = config
@@ -81,6 +82,7 @@ class PlaylistExtractor:
                 true_peak=true_peak,
                 audio_format=audio_format,
                 audio_quality=audio_quality,
+                enable_sponsorblock=enable_sponsorblock,
             )
 
     @property
@@ -153,6 +155,11 @@ class PlaylistExtractor:
         true_peak: float | None = None,
         audio_format: Literal["m4a", "mp3"] | str | None = None,
         audio_quality: str | None = None,
+        enable_sponsorblock: bool | None = None,
+        track_trims: (
+            dict[str, tuple[str | None, str | None] | TrackSnapshot | dict[str, Any]]
+            | None
+        ) = None,
         config: SyncConfig | None = None,
     ) -> None:
         """Download specified videos by their IDs.
@@ -166,6 +173,9 @@ class PlaylistExtractor:
             true_peak: Optional override for true peak level in dBTP.
             audio_format: Optional override for target audio format ("m4a" or "mp3").
             audio_quality: Optional override for audio quality (e.g. "192").
+            enable_sponsorblock: Optional override for SponsorBlock non-music removal.
+            track_trims: Optional mapping of video_id to (trim_start, trim_end) tuples
+                or TrackSnapshot instances for surgical per-track trimming.
             config: Optional SyncConfig instance overriding default settings.
         """
         if not video_ids:
@@ -189,6 +199,11 @@ class PlaylistExtractor:
         eff_audio_quality = (
             audio_quality if audio_quality is not None else effective_cfg.audio_quality
         )
+        eff_sponsorblock = (
+            enable_sponsorblock
+            if enable_sponsorblock is not None
+            else effective_cfg.enable_sponsorblock
+        )
 
         hooks: list[Callable[[dict[str, Any]], None]] = []
         if progress_callback is not None:
@@ -210,15 +225,60 @@ class PlaylistExtractor:
             ],
         }
 
-        if eff_normalize:
-            opts["postprocessor_args"] = {
-                "ExtractAudio": [
-                    "-af",
-                    f"loudnorm=I={eff_target_lufs}:TP={eff_true_peak}:LRA=11",
-                ]
-            }
+        if eff_sponsorblock:
+            opts["sponsorblock_remove"] = ["music_offtopic"]
 
-        urls = [f"https://www.youtube.com/watch?v={vid}" for vid in video_ids]
+        def _get_track_trim(vid: str) -> tuple[str | None, str | None]:
+            if not track_trims or vid not in track_trims:
+                return None, None
+            entry = track_trims[vid]
+            if isinstance(entry, tuple):
+                return entry[0], entry[1]
+            if hasattr(entry, "trim_start") and hasattr(entry, "trim_end"):
+                return entry.trim_start, entry.trim_end
+            if isinstance(entry, dict):
+                return entry.get("trim_start"), entry.get("trim_end")
+            return None, None
 
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.download(urls)
+        has_custom_trims = any(
+            _get_track_trim(vid) != (None, None) for vid in video_ids
+        )
+
+        if not has_custom_trims:
+            base_extract_args: list[str] = []
+            if eff_normalize:
+                base_extract_args.extend(
+                    ["-af", f"loudnorm=I={eff_target_lufs}:TP={eff_true_peak}:LRA=11"]
+                )
+            if base_extract_args:
+                opts["postprocessor_args"] = {"ExtractAudio": base_extract_args}
+
+            urls = [f"https://www.youtube.com/watch?v={vid}" for vid in video_ids]
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                ydl.download(urls)
+        else:
+            for vid in video_ids:
+                track_opts = dict(opts)
+                t_start, t_end = _get_track_trim(vid)
+                track_extract_args: list[str] = []
+                if eff_normalize:
+                    track_extract_args.extend(
+                        [
+                            "-af",
+                            f"loudnorm=I={eff_target_lufs}:TP={eff_true_peak}:LRA=11",
+                        ]
+                    )
+                if t_start:
+                    track_extract_args.extend(["-ss", t_start])
+                if t_end:
+                    track_extract_args.extend(["-to", t_end])
+
+                if track_extract_args:
+                    track_opts["postprocessor_args"] = {
+                        "ExtractAudio": track_extract_args
+                    }
+                elif "postprocessor_args" in track_opts:
+                    del track_opts["postprocessor_args"]
+
+                with yt_dlp.YoutubeDL(track_opts) as ydl:
+                    ydl.download([f"https://www.youtube.com/watch?v={vid}"])

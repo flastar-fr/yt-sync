@@ -392,3 +392,118 @@ class TestPlaylistExtractorDownloadTracks:
         assert "postprocessors" in call_kwargs
         postprocessors = call_kwargs["postprocessors"]
         assert postprocessors[0]["preferredcodec"] == "mp3"
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_with_sponsorblock_enabled_passes_sponsorblock_remove(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.download_tracks(["vid001"], output_dir="/tmp/music")
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert call_kwargs.get("sponsorblock_remove") == ["music_offtopic"]
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_with_sponsorblock_disabled_omits_sponsorblock_remove(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        # Act
+        extractor.download_tracks(
+            ["vid001"], output_dir="/tmp/music", enable_sponsorblock=False
+        )
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert "sponsorblock_remove" not in call_kwargs
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_extractor_level_sponsorblock_disabled_omits_sponsorblock_remove(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor(enable_sponsorblock=False)
+        # Act
+        extractor.download_tracks(["vid001"], output_dir="/tmp/music")
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        assert "sponsorblock_remove" not in call_kwargs
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_applies_trim_start_and_trim_end_to_track(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        track_trims = {"vid001": ("00:12", "03:45")}
+        # Act
+        extractor.download_tracks(
+            ["vid001"], output_dir="/tmp/music", track_trims=track_trims
+        )
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        args = call_kwargs["postprocessor_args"]["ExtractAudio"]
+        assert "-ss" in args
+        assert "00:12" in args
+        assert "-to" in args
+        assert "03:45" in args
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_trim_start_only_applies_to_trimmed_track_without_impacting_others(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        track_trims = {"vid001": ("00:12", None)}
+        # Act
+        extractor.download_tracks(
+            ["vid001", "vid002"], output_dir="/tmp/music", track_trims=track_trims
+        )
+        # Assert
+        assert MockYDL.call_count == 2
+        call_opts_1 = MockYDL.call_args_list[0][0][0]
+        assert "-ss" in call_opts_1["postprocessor_args"]["ExtractAudio"]
+        assert "00:12" in call_opts_1["postprocessor_args"]["ExtractAudio"]
+        call_opts_2 = MockYDL.call_args_list[1][0][0]
+        audio_args_2 = call_opts_2.get("postprocessor_args", {}).get("ExtractAudio", [])
+        assert "-ss" not in audio_args_2
+
+    @patch("yt_sync_core.extractor.yt_dlp.YoutubeDL")
+    def test_download_tracks_supports_track_snapshot_in_track_trims(
+        self, MockYDL: MagicMock
+    ) -> None:
+        # Arrange
+        from yt_sync_core.models import TrackSnapshot
+
+        mock_ydl = _make_ydl_mock()
+        MockYDL.return_value = mock_ydl
+        extractor = PlaylistExtractor()
+        snapshot = TrackSnapshot(
+            video_id="vid001",
+            title="Trimmed",
+            trim_start="00:05",
+            trim_end="02:30",
+        )
+        # Act
+        extractor.download_tracks(
+            ["vid001"], output_dir="/tmp/music", track_trims={"vid001": snapshot}
+        )
+        # Assert
+        call_kwargs = MockYDL.call_args[0][0]
+        args = call_kwargs["postprocessor_args"]["ExtractAudio"]
+        assert "-ss" in args
+        assert "00:05" in args
+        assert "-to" in args
+        assert "02:30" in args

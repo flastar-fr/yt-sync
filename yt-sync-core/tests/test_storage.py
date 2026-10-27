@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from yt_sync_core.exceptions import StateCorruptedError, StateReadError, StateWriteError
-from yt_sync_core.models import SyncState, TrackSnapshot, TrackStatus
+from yt_sync_core.models import SyncConfig, SyncState, TrackSnapshot, TrackStatus
 from yt_sync_core.storage import STATE_FILENAME, StateManager
 
 
@@ -171,6 +171,30 @@ class TestStateManagerSave:
         restored = manager.load()
         # Assert
         assert restored == original
+
+    def test_save_and_load_preserves_track_trims_and_sponsorblock(
+        self, manager: StateManager
+    ) -> None:
+        # Arrange
+        track = TrackSnapshot(
+            video_id="v1",
+            title="Video One",
+            status=TrackStatus.DOWNLOADED,
+            trim_start="00:15",
+            trim_end="03:20",
+        )
+        original = SyncState(
+            tracks={"v1": track},
+            config=SyncConfig(enable_sponsorblock=False),
+        )
+        # Act
+        manager.save(original)
+        restored = manager.load()
+        # Assert
+        assert restored == original
+        assert restored.tracks["v1"].trim_start == "00:15"
+        assert restored.tracks["v1"].trim_end == "03:20"
+        assert restored.enable_sponsorblock is False
 
     def test_save_overwrites_existing_state(self, manager: StateManager) -> None:
         # Arrange — premier état

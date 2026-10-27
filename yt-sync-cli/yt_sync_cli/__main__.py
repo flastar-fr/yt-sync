@@ -48,6 +48,18 @@ def build_parser() -> argparse.ArgumentParser:
         default="m4a",
         help="Target audio format (default: m4a, choices: m4a, mp3).",
     )
+    parser.add_argument(
+        "--no-sponsorblock",
+        action="store_true",
+        help="Disable automatic cutting of non-music segments via SponsorBlock.",
+    )
+    parser.add_argument(
+        "--trim",
+        nargs="+",
+        action="append",
+        metavar="SPEC",
+        help="Specify surgical trim for a track: --trim <video_id> <start> [<end>]",
+    )
     return parser
 
 
@@ -106,6 +118,8 @@ def run_sync(
     dry_run: bool = False,
     normalize_audio: bool = True,
     audio_format: str = "m4a",
+    enable_sponsorblock: bool = True,
+    track_trims: dict[str, tuple[str | None, str | None]] | None = None,
     extractor: PlaylistExtractor | None = None,
 ) -> int:
     """Execute the end-to-end synchronization workflow."""
@@ -113,6 +127,7 @@ def run_sync(
         extractor = PlaylistExtractor(
             normalize_audio=normalize_audio,
             audio_format=audio_format,
+            enable_sponsorblock=enable_sponsorblock,
         )
 
     # 1. Target directory validation and preparation
@@ -158,6 +173,28 @@ def run_sync(
     # 5. Download new tracks
     updated_tracks: dict[str, TrackSnapshot] = dict(current_state.tracks)
 
+    # Prepare merged trims combining state and CLI inputs
+    merged_trims: dict[str, tuple[str | None, str | None]] = {}
+    for vid, snap in current_state.tracks.items():
+        if snap.trim_start or snap.trim_end:
+            merged_trims[vid] = (snap.trim_start, snap.trim_end)
+    if track_trims:
+        merged_trims.update(track_trims)
+
+    # Apply explicit CLI trims to existing tracks in state as well
+    if track_trims:
+        for vid, (t_start, t_end) in track_trims.items():
+            if vid in updated_tracks:
+                old = updated_tracks[vid]
+                updated_tracks[vid] = TrackSnapshot(
+                    video_id=old.video_id,
+                    title=old.title,
+                    status=old.status,
+                    error_message=old.error_message,
+                    trim_start=t_start,
+                    trim_end=t_end,
+                )
+
     # Register unavailable tracks
     for unavail in diff.unavailable_tracks:
         updated_tracks[unavail.video_id] = unavail
@@ -172,13 +209,18 @@ def run_sync(
                 progress_callback=progress_hook,
                 normalize_audio=normalize_audio,
                 audio_format=audio_format,
+                enable_sponsorblock=enable_sponsorblock,
+                track_trims=merged_trims or None,
             )
             # Mark successfully downloaded tracks
             for new_t in diff.new_tracks:
+                t_start, t_end = merged_trims.get(new_t.video_id, (None, None))
                 updated_tracks[new_t.video_id] = TrackSnapshot(
                     video_id=new_t.video_id,
                     title=new_t.title,
                     status=TrackStatus.DOWNLOADED,
+                    trim_start=t_start,
+                    trim_end=t_end,
                 )
         except Exception as exc:
             print(f"\n❌ Error during download: {exc}", file=sys.stderr)
@@ -188,11 +230,14 @@ def run_sync(
                     new_t.video_id not in updated_tracks
                     or updated_tracks[new_t.video_id].status != TrackStatus.DOWNLOADED
                 ):
+                    t_start, t_end = merged_trims.get(new_t.video_id, (None, None))
                     updated_tracks[new_t.video_id] = TrackSnapshot(
                         video_id=new_t.video_id,
                         title=new_t.title,
                         status=TrackStatus.ERROR,
                         error_message=str(exc),
+                        trim_start=t_start,
+                        trim_end=t_end,
                     )
     else:
         print("\n✨ Nothing to download, target directory is up-to-date!")
@@ -208,6 +253,7 @@ def run_sync(
         config=SyncConfig(
             normalize_audio=normalize_audio,
             audio_format=audio_format,
+            enable_sponsorblock=enable_sponsorblock,
         ),
     )
     try:
@@ -224,12 +270,32 @@ def main(argv: list[str] | None = None) -> None:
     """Main CLI entry point."""
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    parsed_trims: dict[str, tuple[str | None, str | None]] = {}
+    if args.trim:
+        for spec in args.trim:
+            if len(spec) >= 2:
+                vid = spec[0]
+                start = (
+                    spec[1]
+                    if spec[1] not in ("-", "none", "None", "")
+                    else None
+                )
+                end = (
+                    spec[2]
+                    if len(spec) >= 3 and spec[2] not in ("-", "none", "None", "")
+                    else None
+                )
+                parsed_trims[vid] = (start, end)
+
     exit_code = run_sync(
         target_dir=args.target_dir,
         playlist_url=args.playlist_url,
         dry_run=args.dry_run,
         normalize_audio=not args.no_normalize,
         audio_format=args.format,
+        enable_sponsorblock=not args.no_sponsorblock,
+        track_trims=parsed_trims or None,
     )
     if exit_code != 0:
         sys.exit(exit_code)

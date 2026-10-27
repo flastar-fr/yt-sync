@@ -51,6 +51,8 @@ class TrackViewItem:
     original_title: str | None = None
     error_message: str | None = None
     can_ignore: bool = False
+    trim_start: str | None = None
+    trim_end: str | None = None
 
 
 def _get_target_dir(request: Request) -> Path:
@@ -75,7 +77,16 @@ def _build_dashboard_context(
     if diff is not None:
         # Build view items from differential analysis
         for t in diff.new_tracks:
-            tracks.append(TrackViewItem(video_id=t.video_id, title=t.title, status="new"))
+            snap = state.tracks.get(t.video_id)
+            tracks.append(
+                TrackViewItem(
+                    video_id=t.video_id,
+                    title=t.title,
+                    status="new",
+                    trim_start=snap.trim_start if snap else None,
+                    trim_end=snap.trim_end if snap else None,
+                )
+            )
 
         for t in diff.unavailable_tracks:
             tracks.append(
@@ -86,6 +97,8 @@ def _build_dashboard_context(
                     original_title=t.title,
                     error_message=t.error_message or "Unavailable on YouTube",
                     can_ignore=True,
+                    trim_start=t.trim_start,
+                    trim_end=t.trim_end,
                 )
             )
 
@@ -96,12 +109,22 @@ def _build_dashboard_context(
                     title=t.title,
                     status="removed",
                     original_title=t.title,
+                    trim_start=t.trim_start,
+                    trim_end=t.trim_end,
                 )
             )
 
         for t in diff.already_downloaded:
             status_str = "skipped" if t.status == TrackStatus.SKIPPED else "downloaded"
-            tracks.append(TrackViewItem(video_id=t.video_id, title=t.title, status=status_str))
+            tracks.append(
+                TrackViewItem(
+                    video_id=t.video_id,
+                    title=t.title,
+                    status=status_str,
+                    trim_start=t.trim_start,
+                    trim_end=t.trim_end,
+                )
+            )
 
         total_count = diff.total_count
         downloaded_count = len(diff.already_downloaded)
@@ -130,6 +153,8 @@ def _build_dashboard_context(
                     original_title=snapshot.title if status_str == "unavailable" else None,
                     error_message=snapshot.error_message,
                     can_ignore=(status_str == "unavailable"),
+                    trim_start=snapshot.trim_start,
+                    trim_end=snapshot.trim_end,
                 )
             )
 
@@ -155,6 +180,7 @@ def _build_dashboard_context(
         "true_peak": state.config.true_peak,
         "audio_format": state.config.audio_format,
         "audio_quality": state.config.audio_quality,
+        "enable_sponsorblock": state.config.enable_sponsorblock,
     }
 
 
@@ -227,6 +253,7 @@ async def post_initialize(
     playlist_url: str = Form(...),
     normalize_audio: str | None = Form(default=None),
     audio_format: str | None = Form(default=None),
+    enable_sponsorblock: str | None = Form(default=None),
     init_form: str | None = Form(default=None),
 ) -> HTMLResponse:
     """Initialize state for target directory by querying remote playlist metadata."""
@@ -239,16 +266,27 @@ async def post_initialize(
             normalize_audio is not None
             and normalize_audio.lower() in ("true", "1", "on")
         )
+        should_sponsorblock = (
+            enable_sponsorblock is not None
+            and enable_sponsorblock.lower() in ("true", "1", "on")
+        )
     elif normalize_audio is not None:
         should_normalize = normalize_audio.lower() in ("true", "1", "on")
+        should_sponsorblock = (
+            enable_sponsorblock.lower() in ("true", "1", "on")
+            if enable_sponsorblock is not None
+            else True
+        )
     else:
         should_normalize = True
+        should_sponsorblock = True
 
     should_format = audio_format if audio_format in ("m4a", "mp3") else "m4a"
 
     extractor = PlaylistExtractor(
         normalize_audio=should_normalize,
         audio_format=should_format,
+        enable_sponsorblock=should_sponsorblock,
     )
     try:
         # Offload yt-dlp metadata extraction to thread pool
@@ -291,6 +329,7 @@ async def post_initialize(
         config=SyncConfig(
             normalize_audio=should_normalize,
             audio_format=should_format,
+            enable_sponsorblock=should_sponsorblock,
         ),
     )
 
@@ -378,6 +417,7 @@ async def post_sync(
     request: Request,
     normalize_audio: str | None = Form(default=None),
     audio_format: str | None = Form(default=None),
+    enable_sponsorblock: str | None = Form(default=None),
     sync_form: str | None = Form(default=None),
 ) -> HTMLResponse:
     """Download missing tracks in background thread pool and update local state."""
@@ -405,10 +445,20 @@ async def post_sync(
             normalize_audio is not None
             and normalize_audio.lower() in ("true", "1", "on")
         )
+        should_sponsorblock = (
+            enable_sponsorblock is not None
+            and enable_sponsorblock.lower() in ("true", "1", "on")
+        )
     elif normalize_audio is not None:
         should_normalize = normalize_audio.lower() in ("true", "1", "on")
+        should_sponsorblock = (
+            enable_sponsorblock.lower() in ("true", "1", "on")
+            if enable_sponsorblock is not None
+            else current_state.config.enable_sponsorblock
+        )
     else:
         should_normalize = current_state.config.normalize_audio
+        should_sponsorblock = current_state.config.enable_sponsorblock
 
     if audio_format is not None and audio_format in ("m4a", "mp3"):
         should_format = audio_format
@@ -418,6 +468,7 @@ async def post_sync(
     extractor = PlaylistExtractor(
         normalize_audio=should_normalize,
         audio_format=should_format,
+        enable_sponsorblock=should_sponsorblock,
     )
     diff_engine = DiffEngine()
 
@@ -450,21 +501,29 @@ async def post_sync(
                 extractor.download_tracks,
                 ids_to_download,
                 output_dir=str(target_dir),
+                enable_sponsorblock=should_sponsorblock,
+                track_trims=current_state.tracks,
             )
             for new_t in diff.new_tracks:
+                existing_t = current_state.tracks.get(new_t.video_id)
                 updated_tracks[new_t.video_id] = TrackSnapshot(
                     video_id=new_t.video_id,
                     title=new_t.title,
                     status=TrackStatus.DOWNLOADED,
+                    trim_start=existing_t.trim_start if existing_t else None,
+                    trim_end=existing_t.trim_end if existing_t else None,
                 )
         except Exception as exc:
             for new_t in diff.new_tracks:
                 if new_t.video_id not in updated_tracks:
+                    existing_t = current_state.tracks.get(new_t.video_id)
                     updated_tracks[new_t.video_id] = TrackSnapshot(
                         video_id=new_t.video_id,
                         title=new_t.title,
                         status=TrackStatus.ERROR,
                         error_message=str(exc),
+                        trim_start=existing_t.trim_start if existing_t else None,
+                        trim_end=existing_t.trim_end if existing_t else None,
                     )
 
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -479,6 +538,7 @@ async def post_sync(
             true_peak=current_state.config.true_peak,
             audio_format=should_format,
             audio_quality=current_state.config.audio_quality,
+            enable_sponsorblock=should_sponsorblock,
         ),
     )
 
@@ -494,6 +554,74 @@ async def post_sync(
     # Re-evaluate diff post-sync
     post_diff = diff_engine.compute(remote_tracks=remote_tracks, current_state=new_state)
     context = _build_dashboard_context(new_state, target_dir, diff=post_diff)
+    return templates.TemplateResponse(
+        request=request,
+        name="fragments/dashboard.html",
+        context=context,
+    )
+
+
+@app.post("/track/{video_id}/trim", response_class=HTMLResponse)
+async def post_track_trim(
+    request: Request,
+    video_id: str,
+    trim_start: str | None = Form(default=None),
+    trim_end: str | None = Form(default=None),
+) -> HTMLResponse:
+    """Configure or update surgical trim for a specific track."""
+    target_dir = _get_target_dir(request)
+    state_manager = StateManager(target_dir=target_dir)
+
+    try:
+        current_state = state_manager.load()
+    except StorageError as exc:
+        return templates.TemplateResponse(
+            request=request,
+            name="fragments/error.html",
+            context={"error_message": f"Could not load state: {exc}"},
+        )
+
+    clean_start = trim_start.strip() if trim_start and trim_start.strip() else None
+    clean_end = trim_end.strip() if trim_end and trim_end.strip() else None
+
+    updated_tracks = dict(current_state.tracks)
+    if video_id in updated_tracks:
+        old_track = updated_tracks[video_id]
+        updated_tracks[video_id] = TrackSnapshot(
+            video_id=old_track.video_id,
+            title=old_track.title,
+            status=old_track.status,
+            error_message=old_track.error_message,
+            trim_start=clean_start,
+            trim_end=clean_end,
+        )
+    else:
+        updated_tracks[video_id] = TrackSnapshot(
+            video_id=video_id,
+            title=video_id,
+            status=TrackStatus.PENDING,
+            trim_start=clean_start,
+            trim_end=clean_end,
+        )
+
+    new_state = SyncState(
+        playlist_url=current_state.playlist_url,
+        playlist_name=current_state.playlist_name,
+        last_synced_at=current_state.last_synced_at,
+        tracks=updated_tracks,
+        config=current_state.config,
+    )
+
+    try:
+        state_manager.save(new_state)
+    except StorageError as exc:
+        return templates.TemplateResponse(
+            request=request,
+            name="fragments/error.html",
+            context={"error_message": f"Failed to save state: {exc}"},
+        )
+
+    context = _build_dashboard_context(new_state, target_dir)
     return templates.TemplateResponse(
         request=request,
         name="fragments/dashboard.html",
@@ -524,6 +652,8 @@ async def post_ignore_track(request: Request, video_id: str) -> HTMLResponse:
             title=old_track.title,
             status=TrackStatus.SKIPPED,
             error_message=old_track.error_message,
+            trim_start=old_track.trim_start,
+            trim_end=old_track.trim_end,
         )
 
         new_state = SyncState(
